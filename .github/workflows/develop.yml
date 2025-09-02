@@ -178,7 +178,7 @@ jobs:
           mkdir -p logs
           cp terraform.log logs/terraform.log || echo "No log available"
           echo "⚠️ Terraform Apply failed. Running analysis script..."
-          python terraform-rag-analyzer.py
+          python terraform-analyzer.py
 
       - name: Fail CI run if Apply failed
         if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
