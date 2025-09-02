@@ -9,11 +9,12 @@ from langchain.schema import Document
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-CODE_PATH = "./"
+CODE_PATH = "./" 
 
 def retrieve_relevant_context(log_content):
     """
     Extract file references from log and retrieve their content directly from repo
+    Preserves original code structure completely
     """
     # Extract file references from Terraform errors
     file_patterns = [
@@ -74,48 +75,54 @@ def get_ai_feedback(log_content, temperature=0):
     prompt = f"""ROLE: You are a Terraform expert. Analyze this failure log systematically and provide solutions to fix in code.
 
 CRITICAL REQUIREMENTS:
-- NEVER use "# other configurations..." or "..." or any truncation
-- Always provide COMPLETE resource blocks with ALL existing attributes
+- Keep the source code as original as possible to avoid information loss
+- NEVER use "# other configurations..." or "..." or any truncation or lazy writing
+- Always provide COMPLETE resource blocks with ALL existing attributes EXACTLY as they appear in the original code
 - Work with ANY AWS resource type (EC2, S3, RDS, Lambda, SQS, etc.)
-- Preserve ALL original attributes, nested blocks, and configurations
-- Only fix the specific error - keep everything else identical
+- Preserve ALL original attributes, nested blocks, configurations, formatting, and indentation
+- Only fix the specific error - keep everything else IDENTICAL to the original
+- Copy the entire original block and only change the problematic line(s)
 
 REQUIRED OUTPUT FORMAT (no deviations):
 
-File: [file_path]
+File: [exact_file_path]
 Block Name: [block_type] "[block_name]" 
-Issue: [one sentence description]
+Issue: [one sentence description of the specific error]
 Solution:
 ```hcl
-[Keep the source code as original as possible to avoid information loss and write complete fixed code block. no lazy writing like other configuration etc.]
+[Write the COMPLETE original resource block with ALL attributes, nested blocks, tags, etc. - only fix the specific error, keep everything else IDENTICAL. No shortcuts, no omissions, no lazy writing like "other configuration etc."]
 ```
 
 ANALYSIS RULES:
 - Analyze errors in the order they appear in the log
-- Include COMPLETE resource blocks in solutions (not partial)
+- Include COMPLETE resource blocks in solutions (copy original and fix only the error)
 - Only output blocks that contain actual errors
 - Use exact file paths from the log
-- Maintain ALL original attributes, tags, lifecycle blocks, etc.
+- Maintain ALL original attributes, tags, lifecycle blocks, comments, formatting
 - Separate multiple issues with a blank line
-- Show the ENTIRE block, not just changed parts
+- Show the ENTIRE block exactly as it appears in original code, not just changed parts
+- Preserve original indentation, spacing, and code style
 
 LOG TO ANALYZE:
 {log_content}
 
-TERRAFORM FILES:
+TERRAFORM FILES (ORIGINAL SOURCE CODE):
 {context}
 
-Begin systematic analysis with complete resource blocks:"""
+Begin systematic analysis - copy original blocks completely and fix only the specific errors:"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a Terraform and AWS expert."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=temperature,
-    )
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a Terraform and AWS expert. Always preserve original code structure and provide complete blocks."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=temperature,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error calling OpenAI API: {str(e)}"
 
 def extract_code_fixes(ai_response):
     pattern = r"File:\s*(.*?)\nBlock Name:\s*(.*?)\n.*?```hcl(.*?)```"
@@ -182,28 +189,41 @@ def find_block_lines(file_path, block_type, name1=None, name2=None):
 def apply_fixes_to_file(fix):
     file_path = fix["file"]
     if not os.path.exists(file_path):
-        print(f"File not found: {file_path}")
-        return
+        print(f"Error: File not found: {file_path}")
+        return False
 
-    with open(file_path, "r") as f:
-        lines = f.readlines()
+    try:
+        with open(file_path, "r") as f:
+            lines = f.readlines()
 
-    block_type, name1, name2 = parse_block_name(fix['block_name'])
-    start_line, end_line = find_block_lines(file_path, block_type, name1, name2)
-    
-    if start_line is None or end_line is None:
-        print(f"Could not find block {fix['block_name']} in {file_path}")
-        return
-    
-    suggestion_lines = fix["suggestion"].strip().splitlines()
-    suggestion_block = [f"{line}\n" for line in suggestion_lines]
+        block_type, name1, name2 = parse_block_name(fix['block_name'])
+        start_line, end_line = find_block_lines(file_path, block_type, name1, name2)
+        
+        if start_line is None or end_line is None:
+            print(f"Error: Could not find block {fix['block_name']} in {file_path}")
+            return False
+        
+        suggestion_lines = fix["suggestion"].strip().splitlines()
+        suggestion_block = [f"{line}\n" for line in suggestion_lines]
 
-    lines[start_line - 1:end_line] = suggestion_block
+        # Backup original content
+        backup_path = f"{file_path}.backup"
+        with open(backup_path, "w") as f:
+            f.writelines(lines)
+        print(f"Created backup: {backup_path}")
 
-    with open(file_path, "w") as f:
-        f.writelines(lines)
+        # Apply fix
+        lines[start_line - 1:end_line] = suggestion_block
 
-    print(f"Applied fix to: {file_path}")
+        with open(file_path, "w") as f:
+            f.writelines(lines)
+
+        print(f"Applied fix to: {file_path} (lines {start_line}-{end_line})")
+        return True
+        
+    except Exception as e:
+        print(f"Error applying fix to {file_path}: {str(e)}")
+        return False
 
 def commit_and_push_changes(branch_name="auto-tf-fix"):
     print(f"\nPreparing to create/reset branch: `{branch_name}`")
@@ -241,31 +261,67 @@ def setup_git_remote():
 
 def main():
     commit_branch = "auto-tf-fix"
+    
+    print("Starting Terraform error analysis and auto-fix...")
+    
+    # Read logs
     log_content = read_terraform_logs()
     if "No logs found." in log_content:
         print("No Terraform logs found. Exiting.")
         return
 
-    ai_response = get_ai_feedback(log_content)
-    print("AI Suggestions:\n")
-    print(ai_response)
-
-    fixes = extract_code_fixes(ai_response)
-    print(f"Found {len(fixes)} fixes to apply")
+    print("Terraform logs found. Analyzing with AI...")
     
-    for fix in fixes:
-        apply_fixes_to_file(fix)
+    # Get AI feedback
+    ai_response = get_ai_feedback(log_content)
+    if ai_response.startswith("Error calling OpenAI API"):
+        print(f"{ai_response}")
+        return
+        
+    print("AI Analysis Complete:")
+    print("="*60)
+    print(ai_response)
+    print("="*60)
 
-    if fixes:
+    # Extract and apply fixes
+    fixes = extract_code_fixes(ai_response)
+    print(f"\nFound {len(fixes)} fixes to apply")
+    
+    successful_fixes = 0
+    for i, fix in enumerate(fixes, 1):
+        print(f"\nApplying fix {i}/{len(fixes)}: {fix['block_name']} in {fix['file']}")
+        if apply_fixes_to_file(fix):
+            successful_fixes += 1
+
+    print(f"\nSuccessfully applied {successful_fixes}/{len(fixes)} fixes")
+
+    # Commit and push if any fixes were applied
+    if successful_fixes > 0:
+        print("\nCommitting and pushing changes...")
         setup_git_remote()
         commit_and_push_changes(commit_branch)
+    else:
+        print("\nNo fixes were applied - skipping git operations")
 
+    # Write summary
     summary_path = os.getenv("GITHUB_STEP_SUMMARY")
     if summary_path:
-        with open(summary_path, "a") as f:
-            f.write("### 🔍 AI Suggestions\n\n")
-            f.write(ai_response)
-            f.write(f"\n\n>Auto-fix applied. Pull the '{commit_branch}' branch and review the code locally.\n")
+        try:
+            with open(summary_path, "a") as f:
+                f.write("### Terraform AI Analysis Results\n\n")
+                f.write(f"**Fixes Found:** {len(fixes)}\n")
+                f.write(f"**Fixes Applied:** {successful_fixes}\n\n")
+                f.write("#### AI Analysis:\n")
+                f.write("```\n")
+                f.write(ai_response)
+                f.write("\n```\n")
+                if successful_fixes > 0:
+                    f.write(f"\n>Auto-fix completed! Pull the '{commit_branch}' branch and review the code locally.\n")
+                else:
+                    f.write(f"\n>No fixes could be applied automatically. Manual intervention may be required.\n")
+            print("GitHub summary updated")
+        except Exception as e:
+            print(f"Could not write GitHub summary: {e}")
 
 if __name__ == "__main__":
     main()
