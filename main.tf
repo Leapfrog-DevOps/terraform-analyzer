@@ -30,26 +30,26 @@ terraform {
   }
 }
 
-module "vpc" {
-  source   = "./modules/vpc"
-  vpc_name = "team-5-vpc"
-}
+# module "vpc" {
+#   source   = "./modules/vpc"
+#   vpc_name = "team-5-vpc"
+# }
 
-module "s3" {
-  source      = "./modules/s3"
-  bucket_name = var.s3_bucket_name
-}
+# module "s3" {
+#   source      = "./modules/s3"
+#   bucket_name = var.s3_bucket_name
+# }
 
 module "lambda" {
   source         = "./modules/lambda"
   function_name  = var.lambda_function_name
-  s3_bucket_name = module.s3.bucket_name
+  # s3_bucket_name = module.s3.bucket_name
 }
 
-module "ec2" {
-  source        = "./modules/ec2"
-  instance_name = var.ec2_instance_name
-  instance_type = "t3.small"
-  vpc_id        = module.vpc.vpc_id
-  subnet_id     = module.vpc.subnet_id
-}
+# module "ec2" {
+#   source        = "./modules/ec2"
+#   instance_name = var.ec2_instance_name
+#   instance_type = "t3.small"
+#   vpc_id        = module.vpc.vpc_id
+#   subnet_id     = module.vpc.subnet_id
+# }
