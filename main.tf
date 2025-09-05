@@ -30,20 +30,20 @@ terraform {
   }
 }
 
-# module "vpc" {
-#   source   = "./modules/vpc"
-#   vpc_name = "team-5-vpc"
-# }
+module "vpc" {
+  source   = "./modules/vpc"
+  vpc_name = "team-5-vpc"
+}
 
-# module "s3" {
-#   source      = "./modules/s3"
-#   bucket_name = var.s3_bucket_name
-# }
+module "s3" {
+  source      = "./modules/s3"
+  bucket_name = var.s3_bucket_name
+}
 
 module "lambda" {
   source         = "./modules/lambda"
   function_name  = var.lambda_function_name
-  # s3_bucket_name = module.s3.bucket_name
+  s3_bucket_name = module.s3.bucket_name
 }
 
 # module "ec2" {
