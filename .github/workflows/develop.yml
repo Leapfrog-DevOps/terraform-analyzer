@@ -55,14 +55,14 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Generate backend and variables
-        run: |
-          make init
-          make prepare
+      # - name: Generate backend and variables
+      #   run: |
+      #     make init
+      #     make prepare
 
       - name: Terraform Init
         run: |
-          terraform init --backend-config=backend.hcl 2>&1 | tee init_output.txt
+          terraform init 2>&1 | tee init_output.txt
           INIT_EXIT_CODE=${PIPESTATUS[0]}
           cat init_output.txt >> terraform.log
           if [ "$INIT_EXIT_CODE" -ne 0 ]; then
@@ -70,6 +70,7 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+
 
       - name: Terraform Plan
         id: plan
@@ -164,10 +165,40 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+      
+      # - uses: actions/cache@v1
+      #   id: cache
+      #   with:
+      #     path: ~/.cache/pip
+      #     key: ${{ runner.os }}-pip-dependencies
+      #     restore-keys: |
+      #       ${{ runner.os }}-pip-
+
+      # - name: Install Python Dependencies
+      #   if: steps.cache.outputs.cache-hit != 'true'
+      #   run: |
+      #     pip install chromadb openai tiktoken langchain-community langchain unstructured langchain-openai
+
+      # - name: Install Python Dependencies on Failure
+      #   if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure'
+      #   run: |
+      #     pip install chromadb openai tiktoken langchain-community langchain unstructured langchain-openai
+
+      - name: Write dependencies to file
+        run: |
+          echo "chromadb openai tiktoken langchain-community langchain unstructured langchain-openai python-hcl2" > dependencies.txt
+
+      - uses: actions/cache@v4
+        id: cache-pip
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('dependencies.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install Python Dependencies
         if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
-        run: pip install chromadb openai tiktoken langchain-community langchain unstructured langchain-openai
+        run: pip install chromadb openai tiktoken langchain-community langchain unstructured langchain-openai python-hcl2
 
       - name: Run AI Analyzer on Failure
         if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
@@ -178,13 +209,36 @@ jobs:
           mkdir -p logs
           cp terraform.log logs/terraform.log || echo "No log available"
           echo "⚠️ Terraform Apply failed. Running analysis script..."
-          python terraform-analyzer.py
+          python test.py
 
       - name: Fail CI run if Apply failed
         if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
         run: |
           echo "❌ Marking the workflow as failed due to Terraform Apply failure."
           exit 1
+
+      - name: Install Infracost
+        run: |
+          terraform show -json tfplan > plan.json
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+          echo "$HOME/.infracost/bin" >> $GITHUB_PATH
+
+      - name: Run Infracost
+        env:
+           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |
+          infracost breakdown --path .
+          infracost breakdown --path . --format json --out-file infracost-base.json
+
+      - name: Check diff
+        env:
+           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |
+          infracost diff --path . --compare-to infracost-base.json
+          
+      # - name: Show cost estimate
+      #   run: |
+      #     cat infracost-output.json
 
 #      - name: Analyze Terraform Errors with OpenAI
 #        env:
