@@ -218,12 +218,14 @@ jobs:
           exit 1
 
       - name: Install Infracost
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         run: |
           terraform show -json tfplan > plan.json
           curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
           echo "$HOME/.infracost/bin" >> $GITHUB_PATH
 
       - name: Run Infracost
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         env:
            INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
@@ -231,6 +233,7 @@ jobs:
           infracost breakdown --path . --format json --out-file infracost-base.json
 
       - name: Check diff
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         env:
            INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
