@@ -225,20 +225,26 @@ jobs:
           echo "$HOME/.infracost/bin" >> $GITHUB_PATH
 
       - name: Run Infracost
-        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+        if: github.event.inputs.action == 'push'
         env:
-           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
           infracost breakdown --path .
+
+      - name: Run Infracost on diff
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |
           infracost breakdown --path . --format json --out-file infracost-base.json
 
       - name: Check diff
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         env:
-           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
           infracost diff --path . --compare-to infracost-base.json
-          
+
       # - name: Show cost estimate
       #   run: |
       #     cat infracost-output.json
