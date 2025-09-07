@@ -113,7 +113,7 @@ Begin systematic analysis - copy original blocks completely and fix only the spe
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4.1-nano",
             messages=[
                 {"role": "system", "content": "You are a Terraform and AWS expert. Always preserve original code structure and provide complete blocks."},
                 {"role": "user", "content": prompt}
