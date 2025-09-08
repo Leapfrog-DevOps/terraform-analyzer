@@ -244,7 +244,9 @@ jobs:
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
-          infracost diff --path . --compare-to infracost-base.json
+          git fetch origin infracost
+          git checkout origin/infracost -- "infracost-develop.json"
+          infracost diff --path . --compare-to infracost-develop.json
       
 
      # push the changes to github branch.
