@@ -229,7 +229,7 @@ jobs:
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
-          infracost breakdown --path .
+          infracost breakdown --path . --out-file infracost.json
 
       - name: Run Infracost on diff
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
@@ -244,6 +244,38 @@ jobs:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
           infracost diff --path . --compare-to infracost-base.json
+      
+
+     # push the changes to github branch.
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current branch name
+        id: extract_branch
+        run: |
+          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}")
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create/switch to environment branch
+        run: |
+          git checkout -B infracost
+
+      - name: Copy Infracost JSON to correct filename
+        run: |
+          FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
+          cp ./infracost.json "./$FILENAME"
+
+      - name: Commit Infracost JSON to infracost branch
+        run: |
+          FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
+          git add "$FILENAME"
+          git commit -m "Update $FILENAME [skip ci]" || echo "No changes to commit"
+
+      - name: Push to environment branch
+        run: |
+          git push origin infracost --force
 
       # - name: Show cost estimate
       #   run: |
