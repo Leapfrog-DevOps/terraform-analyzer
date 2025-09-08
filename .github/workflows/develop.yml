@@ -232,14 +232,14 @@ jobs:
           infracost breakdown --path .
           infracost breakdown --path . --out-file infracost.json
 
-      - name: Run Infracost on diff
-        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-        run: |
-          infracost breakdown --path . --format json --out-file infracost-base.json
+      # - name: Run Infracost on diff
+      #   if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+      #   env:
+      #     INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+      #   run: |
+      #     infracost breakdown --path . --format json --out-file infracost-develop-pr.json
 
-      - name: Check diff
+      - name: Check diff infracost
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
