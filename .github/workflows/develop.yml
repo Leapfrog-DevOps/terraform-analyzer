@@ -229,6 +229,7 @@ jobs:
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
+          infracost breakdown --path .
           infracost breakdown --path . --out-file infracost.json
 
       - name: Run Infracost on diff
