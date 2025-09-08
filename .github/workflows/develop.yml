@@ -252,11 +252,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Get current branch name
+      - name: Get branch name (push or PR)
         id: extract_branch
         run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}")
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "branch_name=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+            echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
 
       - name: Create/switch to environment branch
         run: |
