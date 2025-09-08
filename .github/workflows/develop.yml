@@ -225,7 +225,7 @@ jobs:
           echo "$HOME/.infracost/bin" >> $GITHUB_PATH
 
       - name: Run Infracost
-        if: github.event.inputs.action == 'push'
+#        if: github.event.inputs.action == 'push'
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
