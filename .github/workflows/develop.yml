@@ -257,7 +257,7 @@ jobs:
         id: extract_branch
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "branch_name=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+            echo "branch_name=${{ github.event.pull_request.base.ref }}-pr" >> "$GITHUB_OUTPUT"
           else
             BRANCH_NAME="${GITHUB_REF#refs/heads/}"
             echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
