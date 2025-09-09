@@ -313,4 +313,4 @@ jobs:
             --field source_run_id="$GITHUB_RUN_ID" \
             --field source_repository="$GITHUB_REPOSITORY"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
