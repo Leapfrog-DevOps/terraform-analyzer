@@ -1,12 +1,17 @@
-
 name: Terraform cost analyzer
 
 on:
-  workflow_run:
-    workflows: ["Terraform Develop - Plan & Apply"]
-    types:
-      - completed
-    # branches: [ check_infra_cost ]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Source workflow run ID (find it in the URL of the completed workflow)'
+        required: true
+        type: string
+      source_repository:
+        description: 'Source repository (leave blank for current repo)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   id-token: write
@@ -17,8 +22,6 @@ jobs:
   terraform:
     name: cost
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
-    environment: ${{ (github.event_name == 'pull_request' && github.base_ref == 'develop') && 'develop' || github.ref_name }}
 
     env:
       TF_VERSION: '1.11.4'
@@ -32,14 +35,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Show input parameters
+        run: |
+          echo "🔍 Workflow Parameters:"
+          echo "Source Run ID: ${{ github.event.inputs.source_run_id }}"
+          echo "Source Repository: ${{ github.event.inputs.source_repository || github.repository }}"
+          echo "Current Repository: ${{ github.repository }}"
+
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with: 
             name: tfplan
             path: .
             github-token: ${{ secrets.GITHUB_TOKEN }}
-            repository: ${{ github.repository }}
-            run-id: ${{ github.event.workflow_run.id }}
+            repository: ${{ github.event.inputs.source_repository || github.repository }}
+            run-id: ${{ github.event.inputs.source_run_id }}
+
+      - name: Verify artifacts
+        run: |
+          echo "📦 Downloaded artifacts:"
+          ls -la
+          if [ -f "tfplan" ]; then
+            echo "✅ tfplan artifact found"
+          else
+            echo "❌ tfplan artifact not found"
+            exit 1
+          fi
 
       - name: Install Infracost
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')

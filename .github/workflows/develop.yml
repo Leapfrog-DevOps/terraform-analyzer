@@ -301,3 +301,16 @@ jobs:
 #        env:
 #          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 #        run: python terraform-analyzer.py
+
+      - name: Trigger Cost Analyzer
+        if: success() && (github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan'))
+        run: |
+          echo "Triggering cost analyzer workflow..."
+          echo "Run ID: $GITHUB_RUN_ID"
+          echo "Repository: $GITHUB_REPOSITORY"
+          
+          gh workflow run "Terraform cost analyzer" \
+            --field source_run_id="$GITHUB_RUN_ID" \
+            --field source_repository="$GITHUB_REPOSITORY"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
