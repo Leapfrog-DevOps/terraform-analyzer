@@ -16,6 +16,7 @@ on:
 permissions:
   id-token: write
   contents: write
+  actions: read
   pull-requests: write
 
 jobs:
@@ -47,7 +48,7 @@ jobs:
         with: 
             name: tfplan
             path: .
-            github-token: ${{ secrets.GITHUB_TOKEN }}
+            github-token: ${{ secrets.TOKEN_GITHUB }}
             repository: ${{ github.event.inputs.source_repository || github.repository }}
             run-id: ${{ github.event.inputs.source_run_id }}
 
