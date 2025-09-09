@@ -272,8 +272,7 @@ jobs:
       #       BRANCH_NAME="${GITHUB_REF#refs/heads/}"
       #       echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
       #     fi
-
-
+      
       # - name: Create/switch to environment branch
       #   run: |
       #     git checkout -B infracost
