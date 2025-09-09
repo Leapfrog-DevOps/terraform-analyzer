@@ -6,6 +6,7 @@ on:
     workflows: ["Terraform Develop - Plan & Apply"]
     types:
       - completed
+    branches: [ check_infra_cost ]
 
 permissions:
   id-token: write
@@ -16,6 +17,7 @@ jobs:
   terraform:
     name: cost
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
     environment: ${{ (github.event_name == 'pull_request' && github.base_ref == 'develop') && 'develop' || github.ref_name }}
 
     env:
@@ -38,7 +40,7 @@ jobs:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             repository: ${{ github.repository }}
             run-id: ${{ github.event.workflow_run.id }}
-            
+
       - name: Install Infracost
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         run: |
