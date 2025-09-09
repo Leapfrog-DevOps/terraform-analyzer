@@ -6,7 +6,7 @@ on:
     workflows: ["Terraform Develop - Plan & Apply"]
     types:
       - completed
-    branches: [ check_infra_cost ]
+    # branches: [ check_infra_cost ]
 
 permissions:
   id-token: write
