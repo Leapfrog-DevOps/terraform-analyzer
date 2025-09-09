@@ -2,19 +2,10 @@
 name: Terraform cost analyzer
 
 on:
-  pull_request:
-    branches: [ develop ]
-    types: [ opened, reopened, synchronize ]
-  workflow_dispatch:
-    inputs:
-      action:
-        description: 'Terraform Action'
-        required: true
-        default: apply
-        type: choice
-        options:
-          - apply
-          - plan
+  workflow_run:
+    workflows: ["Terraform Develop - Plan & Apply"]
+    types:
+      - completed
 
 permissions:
   id-token: write
@@ -43,8 +34,11 @@ jobs:
         uses: actions/download-artifact@v4
         with: 
             name: tfplan
-            path: drop/tfplan
-
+            path: .
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            repository: ${{ github.repository }}
+            run-id: ${{ github.event.workflow_run.id }}
+            
       - name: Install Infracost
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
         run: |
