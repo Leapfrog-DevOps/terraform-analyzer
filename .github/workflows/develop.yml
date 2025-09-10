@@ -309,7 +309,7 @@ jobs:
           echo "Run ID: $GITHUB_RUN_ID"
           echo "Repository: $GITHUB_REPOSITORY"
           
-          gh workflow run "Terraform cost analyzer" \
+          gh workflow run "Terraform Analyzer" \
             --field source_run_id="$GITHUB_RUN_ID" \
             --field source_repository="$GITHUB_REPOSITORY"
         env:
