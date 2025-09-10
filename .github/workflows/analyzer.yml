@@ -14,10 +14,7 @@ name: Terraform Analyzer
 #        type: string
 
 on:
-  workflow_run:
-    workflows: [ "Terraform Develop - Plan & Apply" ]
-    types:
-      - completed
+  workflow_call:
     inputs:
       source_run_id:
         description: 'Source workflow run ID (find it in the URL of the completed workflow)'
