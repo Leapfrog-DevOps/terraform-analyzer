@@ -103,7 +103,7 @@ jobs:
             exit 1
           fi
 
-      - name: artificate
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
@@ -321,7 +321,7 @@ jobs:
 
       - name: Trigger Terraform Analyzer
         run: |
-          gh workflow run "Terraform Analyzer" \
+          gh workflow run "Terraform cost analyzer" \
             --ref main \
             --field source_run_id="${{ github.run_id }}" \
             --field source_repository="${{ github.repository }}"
