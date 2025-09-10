@@ -1,7 +1,23 @@
 name: Terraform Analyzer
+#
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      source_run_id:
+#        description: 'Source workflow run ID (find it in the URL of the completed workflow)'
+#        required: true
+#        type: string
+#      source_repository:
+#        description: 'Source repository (leave blank for current repo)'
+#        required: false
+#        default: ''
+#        type: string
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: [ "Terraform Develop - Plan & Apply" ]
+    types:
+      - completed
     inputs:
       source_run_id:
         description: 'Source workflow run ID (find it in the URL of the completed workflow)'
@@ -12,6 +28,7 @@ on:
         required: false
         default: ''
         type: string
+
 
 permissions:
   id-token: write
@@ -45,12 +62,12 @@ jobs:
 
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
-        with: 
-            name: tfplan
-            path: .
-            github-token: ${{ secrets.TOKEN_GITHUB }}
-            repository: ${{ github.event.inputs.source_repository || github.repository }}
-            run-id: ${{ github.event.inputs.source_run_id }}
+        with:
+          name: tfplan
+          path: .
+          github-token: ${{ secrets.TOKEN_GITHUB }}
+          repository: ${{ github.event.inputs.source_repository || github.repository }}
+          run-id: ${{ github.event.inputs.source_run_id }}
 
       - name: Verify artifacts
         run: |
@@ -71,7 +88,7 @@ jobs:
           echo "$HOME/.infracost/bin" >> $GITHUB_PATH
 
       - name: Run Infracost
-#        if: github.event.inputs.action == 'push'
+        #        if: github.event.inputs.action == 'push'
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
@@ -95,7 +112,7 @@ jobs:
           infracost diff --path . --compare-to infracost-develop-pr.json
       
 
-     # push the changes to github branch.
+      # push the changes to github branch.
       - name: Set up Git
         run: |
           git config user.name "github-actions[bot]"
