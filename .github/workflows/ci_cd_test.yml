@@ -1,0 +1,39 @@
+name: Terraform CI/CD - Test
+
+on:
+  pull_request:
+    branches: [ develop ]
+    types: [ opened, reopened, synchronize ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        default: apply
+        type: choice
+        options:
+          - apply
+          - plan
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  terraform:
+    name: Terraform CI/CD Dispatcher
+    runs-on: ubuntu-latest
+
+    env:
+      TERM: xterm-256color
+
+    steps:
+      - name: Calling reusable branch terraform
+        uses: https://github.com/Leapfrog-DevOps/terraform-analyzer/tree/reusebale
+#        with:
+
+      - name: Calling other modules
+        uses: https://github.com/Leapfrog-DevOps/terraform-analyzer/tree/reusebale
+#        with:
