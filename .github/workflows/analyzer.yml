@@ -1,4 +1,4 @@
-name: Terraform cost analyzer
+name: Terraform Analyzer
 
 on:
   workflow_dispatch:
