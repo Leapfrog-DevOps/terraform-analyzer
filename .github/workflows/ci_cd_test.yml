@@ -31,9 +31,9 @@ jobs:
 
     steps:
       - name: Calling reusable branch terraform
-        uses: https://github.com/Leapfrog-DevOps/terraform-analyzer/tree/reusebale
+        uses: https://github.com/Leapfrog-DevOps/terraform-analyzer/tree/reuseable
 #        with:
 
       - name: Calling other modules
-        uses: https://github.com/Leapfrog-DevOps/terraform-analyzer/tree/reusebale
+        uses: https://github.com/Leapfrog-DevOps/terraform-analyzer/tree/reuseable
 #        with:
