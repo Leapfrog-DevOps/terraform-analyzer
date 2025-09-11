@@ -14,6 +14,11 @@ on:
         options:
           - apply
           - plan
+      environment:
+        description: 'Environment'
+        required: true
+        default: dev
+        type: string
 
 permissions:
   id-token: write
@@ -23,30 +28,24 @@ permissions:
 
 jobs:
   terraform:
-    name: Terraform CI/CD Dispatcher
-    runs-on: ubuntu-latest
+    name: Call Terraform Workflow
+    uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
+    with:
+      action: ${{ inputs.action }}
+      environment: ${{ inputs.environment }}
+      aws-region: us-east-2
+      deploy-lambda: false
+    secrets: inherit
 
-    env:
-      TERM: xterm-256color
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Call Terraform workflow
-        uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
-        with:
-          action: ${{ inputs.action || 'apply' }}
-          environment: dev
-          aws-region: us-east-2
-          deploy-lambda: false
-
-      - name: Call Analyzer workflow
-        uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/analyzer.yml@reusable
-        with:
-          action: ${{ inputs.action || 'apply' }}
-          environment: dev
-          source_run_id: ${{ github.run_id }}
-          source_repository: ${{ github.repository }}
-          aws-region: us-east-2
-          deploy-lambda: false
+  analyzer:
+    name: Call Analyzer Workflow
+    needs: terraform
+    uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/analyzer.yml@reusable
+    with:
+      action: ${{ inputs.action }}
+      environment: ${{ inputs.environment }}
+      source_run_id: ${{ github.run_id }}
+      source_repository: ${{ github.repository }}
+      aws-region: us-east-2
+      deploy-lambda: false
+    secrets: inherit
