@@ -48,7 +48,6 @@ jobs:
     needs: terraform
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/analyzer.yml@reusable
     with:
-      action: ${{ github.event.inputs.action || 'apply' }}
       environment: ${{ github.event.inputs.environment || 'dev' }}
       source_run_id: ${{ github.run_id }}
       source_repository: ${{ github.repository }}
