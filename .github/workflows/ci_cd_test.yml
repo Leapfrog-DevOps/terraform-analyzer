@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [ develop ]
     types: [ opened, reopened, synchronize ]
-  workflow_dispatch:
+
+  workflow_dispatch: # Optional, for manual triggers
     inputs:
       action:
         description: 'Terraform Action'
@@ -31,8 +32,8 @@ jobs:
     name: Call Terraform Workflow
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
     with:
-      action: ${{ inputs.action }}
-      environment: ${{ inputs.environment }}
+      action: ${{ github.event.inputs.action || 'apply' }}
+      environment: ${{ github.event.inputs.environment || 'dev' }}
       aws-region: us-east-2
       deploy-lambda: false
     secrets: inherit
@@ -42,8 +43,8 @@ jobs:
     needs: terraform
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/analyzer.yml@reusable
     with:
-      action: ${{ inputs.action }}
-      environment: ${{ inputs.environment }}
+      action: ${{ github.event.inputs.action || 'apply' }}
+      environment: ${{ github.event.inputs.environment || 'dev' }}
       source_run_id: ${{ github.run_id }}
       source_repository: ${{ github.repository }}
       aws-region: us-east-2
