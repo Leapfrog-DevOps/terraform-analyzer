@@ -13,7 +13,7 @@ on:
       action:
         description: 'Terraform Action'
         required: true
-        default: apply
+        default: plan
         type: choice
         options:
           - apply
@@ -35,7 +35,7 @@ jobs:
     name: Call Terraform Workflow
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
     with:
-      action: ${{ github.event.inputs.action || 'apply' }}
+      action: ${{ github.event.inputs.action || 'plan' }}
       environment: ${{ github.event.inputs.environment || 'dev' }}
       aws-region: us-east-2
       deploy-lambda: false
