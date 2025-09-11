@@ -39,6 +39,8 @@ jobs:
       environment: ${{ github.event.inputs.environment || 'dev' }}
       aws-region: us-east-2
       deploy-lambda: false
+      python-version: "3.11"
+      terraform-version: "1.11.4"
     secrets: inherit
 
   analyzer:
