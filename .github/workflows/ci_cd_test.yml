@@ -36,7 +36,7 @@ jobs:
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
     with:
       # artifact_name: "tfpan"
-      action: ${{ github.event.inputs.action || 'plan' }}
+      action: ${{ github.event.inputs.action || 'apply' }}
       environment: ${{ github.event.inputs.environment || 'dev' }}
       aws-region: us-east-2
       deploy-lambda: false
