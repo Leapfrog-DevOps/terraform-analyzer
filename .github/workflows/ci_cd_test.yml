@@ -33,7 +33,7 @@ permissions:
 jobs:
   terraform:
     name: Call Terraform Workflow
-    uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
+    uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/error-analyzer.yml@reusable
     with:
       # artifact_name: "tfpan" #
       tf-action: ${{ inputs.tf-action || 'apply' }}
@@ -47,7 +47,7 @@ jobs:
   analyzer:
     name: Call Analyzer Workflow
     needs: terraform
-    uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/analyzer.yml@reusable
+    uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/cost-analyzer.yml@reusable
     with:
       # artifact_name: ${{ needs.terraform.outputs.artifact_name }}
       environment: ${{ github.event.inputs.environment || 'dev' }}
