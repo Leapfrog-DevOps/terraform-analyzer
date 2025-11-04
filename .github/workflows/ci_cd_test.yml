@@ -35,7 +35,7 @@ jobs:
     name: Call Terraform Workflow
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/develop.yml@reusable
     with:
-      # artifact_name: "tfpan"
+      # artifact_name: "tfpan" #
       tf-action: ${{ inputs.tf-action || 'apply' }}
       environment: ${{ github.event.inputs.environment || 'dev' }}
       aws-region: us-east-2
