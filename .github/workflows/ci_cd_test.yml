@@ -5,7 +5,7 @@ on:
     branches:
       - tf
   pull_request:
-    branches: [ develop ]
+    branches: [ tf ]
     types: [ opened, reopened, synchronize ]
 
   workflow_dispatch: # Optional, for manual triggers
@@ -36,7 +36,7 @@ jobs:
     uses: Leapfrog-DevOps/terraform-analyzer/.github/workflows/error-analyzer.yml@reusable
     with:
       # artifact_name: "tfpan" #
-      tf-action: ${{ inputs.tf-action || 'apply' }}
+      tf-action: ${{ inputs.tf-action || 'plan' }}
       environment: ${{ github.event.inputs.environment || 'dev' }}
       aws-region: us-east-2
       deploy-lambda: false

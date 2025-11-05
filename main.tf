@@ -39,6 +39,10 @@ module "s3" {
   source      = "./modules/s3"
   bucket_name = var.s3_bucket_name
 }
+module "s3-dev5" {
+  source      = "./modules/s3"
+  bucket_name = "test-team-5s"
+}
 
 module "lambda" {
   source         = "./modules/lambda"
