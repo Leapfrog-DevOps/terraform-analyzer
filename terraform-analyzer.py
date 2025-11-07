@@ -3,7 +3,16 @@ import re
 import hcl2
 from openai import OpenAI
 from langchain_community.vectorstores import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+try:
+    from langchain.text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    try:
+        from langchain.text_splitter import RecursiveCharacterTextSplitter  # fallback for older versions
+    except ImportError:
+        raise ImportError(
+            "RecursiveCharacterTextSplitter not found. Install or upgrade langchain: "
+            "pip install --upgrade langchain"
+        )
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.schema import Document
 
