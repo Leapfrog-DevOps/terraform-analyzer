@@ -47,9 +47,14 @@ module "s3-dev5" {
 module "lambda" {
   source         = "./modules/lambda"
   function_name  = var.lambda_function_name
-  s3_bucket_name = module.s3.bucket_na
+  s3_bucket_name = module.s3.bucket_name
 }
 
+module "lambda_new" {
+  source         = "./modules/lambda"
+  function_name  = var.lambda_function_name + "-new"
+  s3_bucket_name = module.s3.bucket_name + "-new"
+}
 
 # module "ec2" {
 #   source        = "./modules/ec2"
