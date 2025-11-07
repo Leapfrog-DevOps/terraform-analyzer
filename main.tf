@@ -52,7 +52,7 @@ module "lambda" {
 
 module "s3" {
   source      = "./modules/s3"
-  bucket_name = abcd
+  bucket_name = abcdd
 }
 
 # module "ec2" {
