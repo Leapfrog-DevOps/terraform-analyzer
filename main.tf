@@ -30,10 +30,10 @@ terraform {
   }
 }
 
-# module "vpc" {
-#   source   = "./modules/vpc"
-#   vpc_name = "team-5-vpc"
-# }
+module "vpc" {
+  source   = "./modules/vpc"
+  vpc_name = "team-5-vpc"
+}
 
 module "s3" {
   source      = "./modules/s3"
@@ -55,10 +55,10 @@ module "s3-new" {
   bucket_name = "test-team-5s-cost"
 }
 
-# module "ec2" {
-#   source        = "./modules/ec2"
-#   instance_name = var.ec2_instance_name
-#   instance_type = "t3.small"
-#   vpc_id        = module.vpc.vpc_id
-#   subnet_id     = module.vpc.subnet_id
-# }
+module "ec2" {
+  source        = "./modules/ec2"
+  instance_name = var.ec2_instance_name
+  instance_type = "t3.small"
+  vpc_id        = module.vpc.vpc_id
+  subnet_id     = module.vpc.subnet_id
+}
