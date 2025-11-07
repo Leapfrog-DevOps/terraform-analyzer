@@ -50,6 +50,11 @@ module "lambda" {
   s3_bucket_name = module.s3.bucket_name
 }
 
+module "s3" {
+  source      = "./modules/s3"
+  bucket_name = a
+}
+
 # module "ec2" {
 #   source        = "./modules/ec2"
 #   instance_name = var.ec2_instance_name
