@@ -50,10 +50,9 @@ module "lambda" {
   s3_bucket_name = module.s3.bucket_name
 }
 
-module "lambda_new" {
-  source         = "./modules/lambda"
-  function_name  = var.lambda_function_name + "-new"
-  s3_bucket_name = module.s3.bucket_name + "-new"
+module "s3-new" {
+  source      = "./modules/s3"
+  bucket_name = "test-team-5s-cost"
 }
 
 # module "ec2" {
