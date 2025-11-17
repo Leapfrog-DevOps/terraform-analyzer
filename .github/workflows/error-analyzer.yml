@@ -135,7 +135,17 @@ jobs:
             exit 1
           fi
 
+      - name: Check if tfplan.json exists
+        id: check_tfplan
+        run: |
+          if [ -f tfplan.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload Build Artifacts
+        if: ${{ needs.terraform.outputs.has_tfplan == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: tfplan.json
