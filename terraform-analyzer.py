@@ -2,10 +2,6 @@ import os
 import re
 import hcl2
 from openai import OpenAI
-from langchain_community.vectorstores import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import DirectoryLoader
-from langchain.schema import Document
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
