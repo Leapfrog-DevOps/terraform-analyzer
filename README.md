@@ -46,45 +46,148 @@ terraform-analyzer/
 - GitHub repository with Actions enabled
 - OpenAI API key (for error analysis)
 - Infracost API key (for cost analysis)
+- Git installed locally
+- Terraform CLI (optional for local testing)
 
-### Required Secrets
-Configure these secrets in your GitHub repository:
+### Step-by-Step Setup
 
-```yaml
-DEPLOYMENT_ROLE: arn:aws:iam::ACCOUNT:role/deployment-role
-OPENAI_API_KEY: sk-...
-INFRACOST_API_KEY: ico-...
-GITHUB_TOKEN: ghp_... (automatically provided)
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/terraform-analyzer.git
+cd terraform-analyzer
 ```
 
-### Required Variables
-Set these repository variables:
+#### 2. Add Your Terraform Code
+> ⚠️ **IMPORTANT**: The current Terraform code in this repository is just a placeholder for demonstration purposes. **DO NOT run it directly** as it may create unwanted AWS resources or fail due to missing dependencies.
 
+Replace the placeholder code with your actual Terraform infrastructure:
+```bash
+# Remove existing placeholder files
+rm -rf terraform/*
+
+# Add your .tf files to terraform/ directory
+# Example structure:
+terraform/
+├── main.tf          # Your main configuration
+├── variables.tf     # Input variables
+├── outputs.tf       # Output values
+└── modules/         # Custom modules (optional)
+```
+
+#### 3. Setup API Keys
+
+**Get OpenAI API Key:**
+1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Create new API key
+3. Copy the key (starts with `sk-`)
+
+**Get Infracost API Key:**
+1. Visit [Infracost Dashboard](https://dashboard.infracost.io/)
+2. Sign up/login and get API key
+3. Copy the key (starts with `ico-`)
+
+#### 4. Configure GitHub Secrets
+Go to your GitHub repository → Settings → Secrets and variables → Actions
+
+**Add Repository Secrets:**
+```yaml
+DEPLOYMENT_ROLE: arn:aws:iam::YOUR-ACCOUNT:role/deployment-role
+OPENAI_API_KEY: sk-your-openai-key-here
+INFRACOST_API_KEY: ico-your-infracost-key-here
+# GITHUB_TOKEN is automatically provided
+```
+
+**Add Repository Variables:**
 ```yaml
 AWS_REGION: us-east-1
 ENVIRONMENT: dev
 DEPLOY_LAMBDA: true
 ```
 
-### AWS IAM Setup
-Create a deployment role with permissions for:
+#### 5. Setup AWS Deployment Role
+
+**Create IAM Role:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::YOUR-ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:YOUR-USERNAME/terraform-analyzer:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Attach Required Policies:**
 - S3 bucket operations
 - Lambda function management
 - EC2 instance management
 - DynamoDB table access (for state locking)
+- IAM permissions for resource creation
 
-## 🚦 Usage
+#### 6. Setup Remote State (First Time Only)
+Create S3 bucket and DynamoDB table for Terraform state:
+```bash
+# Create S3 bucket for state
+aws s3 mb s3://terraform-state-bucket-team5-opensource --region us-east-1
 
-### Automatic Triggers
+# Create DynamoDB table for locking
+aws dynamodb create-table \
+  --table-name terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region us-east-1
+```
+
+## 🚦 Running the Project
+
+### Method 1: Automatic Triggers
 The workflow automatically runs on:
 - **Pull Requests** to `final_test` branch → Runs `terraform plan`
 - **Manual Dispatch** → Choose between `plan` or `apply`
 
-### Manual Execution
+### Method 2: Manual Execution
 1. Go to Actions tab in your repository
 2. Select "Terraform - Plan & Apply" workflow
 3. Click "Run workflow"
 4. Choose action: `plan` or `apply`
+5. Click "Run workflow" button
+
+### Method 3: Create Pull Request
+1. Create a new branch:
+   ```bash
+   git checkout -b feature/my-infrastructure
+   ```
+2. Make changes to Terraform files
+3. Commit and push:
+   ```bash
+   git add .
+   git commit -m "Add new infrastructure"
+   git push origin feature/my-infrastructure
+   ```
+4. Create PR to `final_test` branch
+5. Workflow automatically runs `terraform plan`
+
+### First Run Setup
+> ⚠️ **WARNING**: Make sure you have replaced the placeholder Terraform code with your actual infrastructure code before running any workflows.
+
+1. Ensure all secrets and variables are configured
+2. Replace placeholder Terraform code with your actual infrastructure
+3. Run manual workflow with `plan` action first
+4. Review the plan output in GitHub Actions
+5. If plan looks good, run with `apply` action
+6. Monitor logs for any errors or AI auto-fixes
 
 ### Workflow Behavior
 
