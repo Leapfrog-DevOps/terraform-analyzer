@@ -13,20 +13,20 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Creator = "Team 5 Opensource"
-      Project = "DevOps_OpenSource"
-      Name    = "Team 5"
+      Creator = "sample-creator"
+      Project = "sample-project"
+      Name    = "sample-name"
     }
   }
 }
 
 terraform {
   backend "s3" {
-    bucket  = "terraform-state-bucket-team5-opensource"
-    key     = "terraform.tfstate"
+    bucket  = "sample-bucket"
+    key     = "sample.tfstate"
     region  = "us-east-1"
     encrypt = true
-    dynamodb_table = "terraform-locks"
+    dynamodb_table = "sample-locks-table"
   }
 }
 
@@ -34,9 +34,9 @@ module "s3" {
   source      = "./modules/s3"
   bucket_name = var.s3_bucket_name
 }
-module "s3-dev5" {
+module "s3_sample_test" {
   source      = "./modules/s3"
-  bucket_name = "test-team-5s"
+  bucket_name = "sample-test-bucket"
 }
 
 module "lambda" {
