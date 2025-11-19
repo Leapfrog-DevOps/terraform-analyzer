@@ -194,14 +194,13 @@ The workflow automatically runs on:
 #### On Pull Request
 1. Runs `terraform plan`
 2. Posts plan summary as PR comment
-3. Uploads plan artifacts for cost analysis
-4. Triggers cost analyzer workflow
-5. If errors occur, runs AI analysis and creates auto-fix branch
+3. **If plan fails**: Triggers AI error analysis and creates auto-fix branch
+4. **If plan succeeds**: Uploads plan artifacts and triggers cost analyzer workflow
 
 #### On Manual Apply
 1. Runs `terraform apply`
-2. If successful, deploys infrastructure
-3. If errors occur, analyzes and attempts auto-fix
+2. If successful, create infrastructure
+3. If errors occur, runs the analyzer and attempts and push to auto-fix branch.
 
 ## 🤖 AI Error Analysis
 
@@ -235,6 +234,8 @@ When Terraform operations fail, the analyzer:
 - Compares costs between different plan versions
 - Tracks cost changes over time
 - Stores cost data in dedicated `infracost` branch
+- **Cost Baseline**: Uses `infracost` branch as cost state reference for drift detection
+- **Free Tier**: Up to 1,000 runs per month at no cost
 
 ### Cost Tracking
 - Baseline costs stored per environment
@@ -309,6 +310,10 @@ For issues and questions:
 - Review AI analysis output for Terraform errors
 - Consult AWS documentation for permission issues
 
+## 🔮 Plan for Future
+
+We are planning to build our own AI-powered open source cost analyzer.
+
 ---
 
-**Built with ❤️ by Team 5 Opensource**
+**Built with ❤️ by Terraform Analyzer Team**
