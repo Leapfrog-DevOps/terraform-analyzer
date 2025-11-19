@@ -61,6 +61,12 @@ cd terraform-analyzer
 > ⚠️ **IMPORTANT**: The current Terraform code in this repository is just a placeholder for demonstration purposes. **DO NOT run it directly** as it may create unwanted AWS resources or fail due to missing dependencies.
 
 Replace the placeholder code with your actual Terraform infrastructure:
+
+**Custom Directory Setup (Optional):**
+If you prefer a different directory structure:
+1. Create your custom folder (e.g., `infrastructure/`)
+2. Update `CODE_PATH` variable in `terraform-analyzer.py`
+3. Update working directory paths in `.github/workflows/terraform-analyzer.yml`
 ```bash
 # Remove existing placeholder files
 rm -rf terraform/*
