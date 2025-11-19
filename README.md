@@ -114,13 +114,13 @@ DEPLOY_LAMBDA: true
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::YOUR-ACCOUNT:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::<your-account>:oidc-provider/token.actions.githubusercontent.com"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:YOUR-USERNAME/terraform-analyzer:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": "repo:<your-org-name>/<your-repo-name>:ref:refs/heads/main"
         }
       }
     }

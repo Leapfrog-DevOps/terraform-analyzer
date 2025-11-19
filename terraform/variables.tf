@@ -21,4 +21,3 @@ variable "ec2_instance_name" {
   type        = string
   default     = "sample-ec2"
 }
-
