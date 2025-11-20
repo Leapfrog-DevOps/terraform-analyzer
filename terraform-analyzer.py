@@ -5,7 +5,8 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-CODE_PATH = "./" 
+CODE_PATH = "./terraform/"
+
 
 def retrieve_relevant_context(log_content):
     """
@@ -19,9 +20,9 @@ def retrieve_relevant_context(log_content):
         r'Error.*?([\w\-\/\.]+\.tf)',
         r'module\.([\w\-]+)',
     ]
-    
+
     referenced_files = set()
-    
+
     for pattern in file_patterns:
         matches = re.findall(pattern, log_content)
         for match in matches:
@@ -29,7 +30,7 @@ def retrieve_relevant_context(log_content):
                 referenced_files.add(match[0])
             else:
                 referenced_files.add(match)
-    
+
     # If no specific files found in log, include all .tf files in CODE_PATH
     if not referenced_files:
         for root, _, files in os.walk(CODE_PATH):
@@ -39,12 +40,12 @@ def retrieve_relevant_context(log_content):
                     # Make path relative to CODE_PATH for consistency
                     rel_path = os.path.relpath(file_path, CODE_PATH)
                     referenced_files.add(rel_path)
-    
+
     context = ""
     for file_path in referenced_files:
         # Construct full path from CODE_PATH
         full_path = os.path.join(CODE_PATH, file_path) if not os.path.isabs(file_path) else file_path
-        
+
         if os.path.exists(full_path):
             try:
                 with open(full_path, 'r') as f:
@@ -52,8 +53,9 @@ def retrieve_relevant_context(log_content):
                 context += f"\n## File: {file_path}\n```hcl\n{content}\n```\n"
             except Exception as e:
                 context += f"\n## File: {file_path}\n[Error reading file: {e}]\n"
-    
+
     return context
+
 
 def read_terraform_logs():
     log_path = "logs/terraform.log"
@@ -61,6 +63,7 @@ def read_terraform_logs():
         return "No logs found."
     with open(log_path, "r") as file:
         return file.read()
+
 
 def get_ai_feedback(log_content, temperature=0):
     """
@@ -111,7 +114,8 @@ Begin systematic analysis - copy original blocks completely and fix only the spe
         response = client.chat.completions.create(
             model="gpt-4.1-nano",
             messages=[
-                {"role": "system", "content": "You are a Terraform and AWS expert. Always preserve original code structure and provide complete blocks."},
+                {"role": "system",
+                 "content": "You are a Terraform and AWS expert. Always preserve original code structure and provide complete blocks."},
                 {"role": "user", "content": prompt}
             ],
             temperature=temperature,
@@ -119,6 +123,7 @@ Begin systematic analysis - copy original blocks completely and fix only the spe
         return response.choices[0].message.content
     except Exception as e:
         return f"Error calling OpenAI API: {str(e)}"
+
 
 def extract_code_fixes(ai_response):
     pattern = r"File:\s*(.*?)\nBlock Name:\s*(.*?)\n.*?```hcl(.*?)```"
@@ -134,6 +139,7 @@ def extract_code_fixes(ai_response):
         })
     return fixes
 
+
 def parse_block_name(block_name_str):
     parts = re.findall(r'"(.*?)"', block_name_str)
     block_type = block_name_str.split()[0]  # module, resource, etc.
@@ -144,6 +150,7 @@ def parse_block_name(block_name_str):
         return block_type, parts[0], parts[1]
     else:
         return block_type, None, None
+
 
 def find_block_lines(file_path, block_type, name1=None, name2=None):
     start_line = None
@@ -182,8 +189,9 @@ def find_block_lines(file_path, block_type, name1=None, name2=None):
     else:
         return None, None
 
+
 def apply_fixes_to_file(fix):
-    file_path = fix["file"]
+    file_path = os.path.join(CODE_PATH, fix["file"])
     if not os.path.exists(file_path):
         print(f"Error: File not found: {file_path}")
         return False
@@ -194,11 +202,11 @@ def apply_fixes_to_file(fix):
 
         block_type, name1, name2 = parse_block_name(fix['block_name'])
         start_line, end_line = find_block_lines(file_path, block_type, name1, name2)
-        
+
         if start_line is None or end_line is None:
             print(f"Error: Could not find block {fix['block_name']} in {file_path}")
             return False
-        
+
         suggestion_lines = fix["suggestion"].strip().splitlines()
         suggestion_block = [f"{line}\n" for line in suggestion_lines]
 
@@ -216,35 +224,67 @@ def apply_fixes_to_file(fix):
 
         print(f"Applied fix to: {file_path} (lines {start_line}-{end_line})")
         return True
-        
+
     except Exception as e:
         print(f"Error applying fix to {file_path}: {str(e)}")
         return False
 
-def commit_and_push_changes(branch_name="auto-tf-fix"):
+
+import glob
+
+
+def commit_and_push_changes(branch_name="auto-tf-fix", ignore_paths=None):
+    ignore_paths = ignore_paths or []
+
     print(f"\nPreparing to create/reset branch: `{branch_name}`")
 
     os.system("git config user.name 'terraform-bot'")
     os.system("git config user.email 'bot@example.com'")
+    os.system("git fetch origin")
 
-    os.system(f"git fetch origin")
+    branch_exists = os.system(
+        f"git ls-remote --exit-code --heads origin {branch_name} > /dev/null"
+    ) == 0
 
-    branch_check = os.system(f"git ls-remote --exit-code --heads origin {branch_name} > /dev/null")
-
-    if branch_check == 0:
+    if branch_exists:
         print(f" Remote branch `{branch_name}` exists. Deleting it...")
         os.system(f"git push origin --delete {branch_name}")
 
     os.system(f"git checkout -B {branch_name}")
 
+    print("Adding all files except ignored patterns...")
     os.system("git add .")
-    commit_result = os.system("git commit -m '🤖 Auto-fixed Terraform configuration errors'")
+
+    # Automatically detect correct folder for ignored files
+    expanded_ignores = []
+    for pattern in ignore_paths:
+        # Search recursively inside the entire repo starting from CODE_PATH
+        matches = glob.glob(os.path.join(CODE_PATH, "**", pattern), recursive=True)
+
+        if matches:
+            for m in matches:
+                expanded_ignores.append(m)
+                print(f" - Auto-ignoring detected file: {m}")
+        else:
+            # No match detected, fallback to root-level path
+            fallback = os.path.join(CODE_PATH, pattern)
+            expanded_ignores.append(fallback)
+            print(f" - No matches found. Ignoring fallback: {fallback}")
+
+    # Unstage all matching files before commit
+    for path in expanded_ignores:
+        os.system(f"git reset HEAD -- '{path}'")
+
+    commit_result = os.system(
+        "git commit -m 'Auto-fixed Terraform configuration errors'"
+    )
 
     if commit_result != 0:
         print("No changes to commit. Skipping push.")
         return
 
     os.system(f"git push -f origin {branch_name}")
+
 
 def setup_git_remote():
     token = os.getenv("GITHUB_TOKEN")
@@ -255,11 +295,12 @@ def setup_git_remote():
     else:
         print("GITHUB_TOKEN or GITHUB_REPOSITORY not set")
 
+
 def main():
-    commit_branch = "auto-tf-fix"
-    
+    commit_branch = "auto-tf-fix"  # replace this with branch name of your choice
+
     print("Starting Terraform error analysis and auto-fix...")
-    
+
     # Read logs
     log_content = read_terraform_logs()
     if "No logs found." in log_content:
@@ -267,22 +308,22 @@ def main():
         return
 
     print("Terraform logs found. Analyzing with AI...")
-    
+
     # Get AI feedback
     ai_response = get_ai_feedback(log_content)
     if ai_response.startswith("Error calling OpenAI API"):
         print(f"{ai_response}")
         return
-        
+
     print("AI Analysis Complete:")
-    print("="*60)
+    print("=" * 60)
     print(ai_response)
-    print("="*60)
+    print("=" * 60)
 
     # Extract and apply fixes
     fixes = extract_code_fixes(ai_response)
     print(f"\nFound {len(fixes)} fixes to apply")
-    
+
     successful_fixes = 0
     for i, fix in enumerate(fixes, 1):
         print(f"\nApplying fix {i}/{len(fixes)}: {fix['block_name']} in {fix['file']}")
@@ -295,7 +336,11 @@ def main():
     if successful_fixes > 0:
         print("\nCommitting and pushing changes...")
         setup_git_remote()
-        commit_and_push_changes(commit_branch)
+        commit_and_push_changes(commit_branch, ignore_paths=[
+            "init_output.txt",
+            "plan_*.txt",
+            "tfplan.json"
+        ])
     else:
         print("\nNo fixes were applied - skipping git operations")
 
@@ -318,6 +363,7 @@ def main():
             print("GitHub summary updated")
         except Exception as e:
             print(f"Could not write GitHub summary: {e}")
+
 
 if __name__ == "__main__":
     main()

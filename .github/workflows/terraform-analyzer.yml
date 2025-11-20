@@ -1,0 +1,214 @@
+name: Terraform - Plan & Apply
+
+on:
+  pull_request:
+    branches: [ final_test ]
+    types: [ opened, reopened, synchronize ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        default: plan
+        type: choice
+        options:
+          - apply
+          - plan
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+
+    outputs:
+      has_tfplan: ${{ steps.check_tfplan.outputs.exists }}
+
+    env:
+      TF_VERSION: '1.11.4'
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+      DEPLOY_LAMBDA: ${{ vars.DEPLOY_LAMBDA }}
+      TF_IN_AUTOMATION: "true"
+      TERM: xterm-256color
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Move into terraform directory
+      - name: Move to Terraform directory
+        run: cd terraform
+        shell: bash
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEPLOYMENT_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init 2>&1 | tee ../init_output.txt
+          INIT_EXIT_CODE=${PIPESTATUS[0]}
+          cat ../init_output.txt >> ../terraform.log
+          if [ "$INIT_EXIT_CODE" -ne 0 ]; then
+            echo "Terraform init failed."
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+        continue-on-error: true
+        run: |
+          cd terraform
+          terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee ../plan_output.txt
+          PLAN_EXIT_CODE=${PIPESTATUS[0]}
+          cat ../plan_output.txt >> ../terraform.log
+          echo "--- END OF PLAN ---" >> ../terraform.log
+
+          terraform show -no-color tfplan > ../plan_readable.txt || true
+          terraform show -json tfplan > tfplan.json
+
+          grep -E '^  # |Plan: |No changes.' ../plan_output.txt | nl > ../plan_summary.txt
+
+      - name: Check if tfplan.json exists
+        id: check_tfplan
+        run: |
+          if [ -f terraform/tfplan.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Build Artifacts
+        if: steps.check_tfplan.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan.json
+          path: terraform/tfplan.json
+          retention-days: 30
+          compression-level: 6
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const planSummary = process.env.PLAN_OUTPUT;
+            const fullPlan = require('fs').readFileSync('plan_readable.txt', 'utf8');
+            
+            const comment = `
+            ### 🔍 Terraform Plan Results
+            
+            ${planSummary}
+            
+            <details><summary>💬 View Full Terraform Plan</summary>
+            
+            \`\`\`hcl
+            ${fullPlan}
+            \`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Event: \`${{ github.event_name }}\`*`;
+            
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Terraform Plan Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Terraform Apply
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'
+        run: |
+          terraform apply -auto-approve 2>&1 | tee apply_output.txt
+          APPLY_EXIT_CODE=${PIPESTATUS[0]}
+          cat apply_output.txt >> terraform.log
+          echo "--- END OF APPLY ---" >> terraform.log
+          if [ "$APPLY_EXIT_CODE" -ne 0 ]; then
+            echo "Terraform apply failed."
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Install Python Dependencies
+        if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
+        run: pip install -r requirements.txt
+
+      - name: Run AI Analyzer on Failure
+        if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p logs
+          cp terraform.log logs/terraform.log || echo "No log available"
+          echo "⚠️ Terraform Apply failed. Running analysis script..."
+          python terraform-analyzer.py
+
+      - name: Fail CI run if Apply failed
+        if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
+        run: |
+          echo "❌ Marking the workflow as failed due to Terraform Apply failure."
+          exit 1
+
+      - name: Analyze Terraform Errors with OpenAI
+        if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' ||  steps.apply.outcome == 'failure'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python terraform-analyzer.py
+
+  analyzer:
+    name: Call Analyzer Workflow
+    needs: terraform
+    if: ${{ needs.terraform.outputs.has_tfplan == 'true' }}
+    uses: ./.github/workflows/cost-analyzer.yml
+    with:
+      environment: ${{ github.event.inputs.environment || 'dev' }}
+      source_run_id: ${{ github.run_id }}
+      source_repository: ${{ github.repository }}
+      aws-region: us-east-2
+      deploy-lambda: false
+    secrets: inherit

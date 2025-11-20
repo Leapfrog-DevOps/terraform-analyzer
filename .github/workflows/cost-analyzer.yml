@@ -1,0 +1,171 @@
+name: Terraform Cost Analyzer
+
+on:
+  workflow_call:
+    inputs:
+      source_run_id:
+        description: 'Source workflow run ID (find it in the URL of the completed workflow)'
+        required: true
+        type: string
+      source_repository:
+        description: 'Source repository (leave blank for current repo)'
+        required: false
+        default: ''
+        type: string
+      aws-region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      deploy-lambda:
+        description: 'Deploy Lambda flag'
+        required: true
+        type: string
+
+
+permissions:
+  id-token: write
+  contents: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  terraform:
+    name: Terraform Cost Analyzer
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VERSION: ${{ inputs.terraform-version || '1.11.4' }}
+      AWS_REGION: ${{ inputs.aws-region || vars.AWS_REGION }}
+      ENVIRONMENT: ${{ inputs.environment || vars.ENVIRONMENT }}
+      DEPLOY_LAMBDA: ${{ inputs.deploy-lambda || vars.DEPLOY_LAMBDA }}
+      TF_IN_AUTOMATION: "true"
+      TERM: xterm-256color
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Show input parameters
+        run: |
+          echo "🔍 Workflow Parameters:"
+          echo "Source Run ID: ${{ github.event.inputs.source_run_id }}"
+          echo "Source Repository: ${{ github.event.inputs.source_repository || github.repository }}"
+          echo "Current Repository: ${{ github.repository }}"
+
+      - name: Download tfplan artifact from source repo
+        id: download_tfplan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_id="${{ inputs.source_run_id }}"
+          repo="${{ inputs.source_repository || github.repository }}"
+          artifact_name="tfplan.json"
+
+          echo "🔍 Checking for artifact '$artifact_name' in $repo (run $run_id)..."
+          artifact_id=$(gh api "repos/$repo/actions/runs/$run_id/artifacts" \
+            --jq ".artifacts[] | select(.name==\"$artifact_name\") | .id" || true)
+
+          if [ -z "$artifact_id" ]; then
+            echo "⚠️ No tfplan.json artifact found. Skipping cost analysis."
+            echo "skip_cost=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "✅ Artifact found (ID: $artifact_id). Downloading..."
+          gh api -H "Accept: application/vnd.github+json" \
+            "/repos/$repo/actions/artifacts/$artifact_id/zip" > tfplan.zip
+          unzip tfplan.zip
+          echo "skip_cost=false" >> "$GITHUB_OUTPUT"
+
+      - name: Verify artifacts
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          echo "📦 Downloaded artifacts:"
+          ls -la
+          if [ -f "tfplan.json" ]; then
+            echo "✅ tfplan.json artifact found"
+          else
+            echo "❌ tfplan.json artifact not found"
+            exit 1
+          fi
+
+      - name: Install Infracost
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+          echo "$HOME/.infracost/bin" >> $GITHUB_PATH
+
+      - name: Get branch name (push or PR)
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        id: extract_branch
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "branch_name=${{ github.event.pull_request.base.ref }}-pr" >> "$GITHUB_OUTPUT"
+          else
+            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+            echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Infracost
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |
+          infracost breakdown --path . > infracost-output.txt
+          echo "### Infracost Breakdown :chart_with_upwards_trend:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following is the result of the Infracost breakdown:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat infracost-output.txt >> $GITHUB_STEP_SUMMARY
+          infracost breakdown --path . --format json --out-file infracost.json
+
+      - name: Check diff infracost
+        if: steps.download_tfplan.outputs.skip_cost != 'true' && github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+        run: |
+          set -e  # Exit immediately if a command fails
+          FILE="infracost-${{ steps.extract_branch.outputs.branch_name }}-pr.json"
+          # Fetch remote branch
+          git fetch origin infracost
+          # Check if the file exists in the remote infracost branch
+          if git ls-tree -r origin/infracost --name-only | grep -q "^${FILE}$"; then
+            echo "✅ Found ${FILE} in origin/infracost, checking it out..."
+            git checkout origin/infracost -- "${FILE}"
+            infracost diff --path . --compare-to "${FILE}"
+          else
+            echo "⚠️ File ${FILE} does not exist in origin/infracost — skipping infracost diff."
+          fi
+
+      - name: Set up Git
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create/switch to environment branch
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          git checkout -B infracost
+
+      - name: Copy Infracost JSON to correct filename
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
+          cp ./infracost.json "./$FILENAME"
+
+      - name: Commit Infracost JSON to infracost branch
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
+          git add "$FILENAME"
+          git commit -m "Update $FILENAME [skip ci]" || echo "No changes to commit"
+
+      - name: Push to environment branch
+        if: steps.download_tfplan.outputs.skip_cost != 'true'
+        run: |
+          git push origin infracost --force
