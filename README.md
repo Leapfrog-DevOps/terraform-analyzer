@@ -77,13 +77,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Terraform AI Analyzer
-        uses: Leapfrog-DevOps/terraform-analyzer@v0.5
+        uses: Leapfrog-DevOps/terraform-analyzer@v0.6
         with:
           deployment-role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           infracost-api-key: ${{ secrets.INFRACOST_API_KEY }}
           action: ${{ github.event.inputs.action || 'plan' }}
 ```
+Complete workflow can be found [here](example/workflow.yml).
 
 ### 📋 Prerequisites
 
@@ -113,6 +114,7 @@ Add these to your repository secrets:
 | `deployment-role`      | AWS IAM role ARN               | **Yes**  | -             |
 | `openai-api-key`       | OpenAI API key                 | **Yes**  | -             |
 | `infracost-api-key`    | Infracost API key              | No       | -             |
+| `mode`                 | Action mode: (analyze/cost)    | No       | `analyze`     |
 | `enable-cost-analysis` | Enable cost analysis           | No       | `true`        |
 | `comment-pr`           | Comment on PRs                 | No       | `true`        |
 

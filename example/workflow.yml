@@ -75,7 +75,7 @@ jobs:
 
       - name: Analyze Terraform Errors with AI
         if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure'
-        uses: karna256/terraform-analyzer@v0.0.1
+        uses: Leapfrog-DevOps/terraform-analyzer@v0.6
         with:
           mode: 'analyze'
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -86,7 +86,7 @@ jobs:
 
       - name: Analyze Terraform Costs
         if: steps.plan.outcome == 'success'
-        uses: karna256/terraform-analyzer@v0.0.1
+        uses: Leapfrog-DevOps/terraform-analyzer@v0.6
         with:
           mode: 'cost'
           infracost-api-key: ${{ secrets.INFRACOST_API_KEY }}
