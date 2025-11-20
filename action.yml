@@ -2,7 +2,7 @@ name: 'Terraform AI Analyzer'
 description: 'Analyze Terraform errors with AI and automatically fix common issues'
 author: 'terraform-analyzer'
 branding:
-  icon: 'tool'
+  icon: 'check-square'
   color: 'purple'
 
 inputs:
