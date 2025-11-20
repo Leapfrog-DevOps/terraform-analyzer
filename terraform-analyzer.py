@@ -2,14 +2,10 @@ import os
 import re
 import hcl2
 from openai import OpenAI
-from langchain_community.vectorstores import Chroma
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from langchain_community.document_loaders import DirectoryLoader
-# from langchain.schema import Document
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-CODE_PATH = "./"
+CODE_PATH = os.getenv("CODE_PATH", "./terraform/")
 
 
 def retrieve_relevant_context(log_content):
@@ -195,7 +191,7 @@ def find_block_lines(file_path, block_type, name1=None, name2=None):
 
 
 def apply_fixes_to_file(fix):
-    file_path = fix["file"]
+    file_path = os.path.join(CODE_PATH, fix["file"])
     if not os.path.exists(file_path):
         print(f"Error: File not found: {file_path}")
         return False
@@ -234,24 +230,54 @@ def apply_fixes_to_file(fix):
         return False
 
 
-def commit_and_push_changes(branch_name="auto-tf-fix"):
+import glob
+
+
+def commit_and_push_changes(branch_name="auto-tf-fix", ignore_paths=None):
+    ignore_paths = ignore_paths or []
+
     print(f"\nPreparing to create/reset branch: `{branch_name}`")
 
     os.system("git config user.name 'terraform-bot'")
     os.system("git config user.email 'bot@example.com'")
+    os.system("git fetch origin")
 
-    os.system(f"git fetch origin")
+    branch_exists = os.system(
+        f"git ls-remote --exit-code --heads origin {branch_name} > /dev/null"
+    ) == 0
 
-    branch_check = os.system(f"git ls-remote --exit-code --heads origin {branch_name} > /dev/null")
-
-    if branch_check == 0:
+    if branch_exists:
         print(f" Remote branch `{branch_name}` exists. Deleting it...")
         os.system(f"git push origin --delete {branch_name}")
 
     os.system(f"git checkout -B {branch_name}")
 
+    print("Adding all files except ignored patterns...")
     os.system("git add .")
-    commit_result = os.system("git commit -m '🤖 Auto-fixed Terraform configuration errors'")
+
+    # Automatically detect correct folder for ignored files
+    expanded_ignores = []
+    for pattern in ignore_paths:
+        # Search recursively inside the entire repo starting from CODE_PATH
+        matches = glob.glob(os.path.join(CODE_PATH, "**", pattern), recursive=True)
+
+        if matches:
+            for m in matches:
+                expanded_ignores.append(m)
+                print(f" - Auto-ignoring detected file: {m}")
+        else:
+            # No match detected, fallback to root-level path
+            fallback = os.path.join(CODE_PATH, pattern)
+            expanded_ignores.append(fallback)
+            print(f" - No matches found. Ignoring fallback: {fallback}")
+
+    # Unstage all matching files before commit
+    for path in expanded_ignores:
+        os.system(f"git reset HEAD -- '{path}'")
+
+    commit_result = os.system(
+        "git commit -m 'Auto-fixed Terraform configuration errors'"
+    )
 
     if commit_result != 0:
         print("No changes to commit. Skipping push.")
@@ -271,7 +297,8 @@ def setup_git_remote():
 
 
 def main():
-    commit_branch = "auto-tf-fix"
+    commit_branch = os.getenv("BRANCH_NAME", "auto-tf-fix")
+    auto_fix = os.getenv("AUTO_FIX", "true").lower() == "true"
 
     print("Starting Terraform error analysis and auto-fix...")
 
@@ -305,12 +332,25 @@ def main():
             successful_fixes += 1
 
     print(f"\nSuccessfully applied {successful_fixes}/{len(fixes)} fixes")
+    
+    # Set GitHub Action outputs
+    github_output = os.getenv("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"fixes-applied={successful_fixes}\n")
+            f.write(f"analysis-summary={ai_response[:500]}...\n")
 
-    # Commit and push if any fixes were applied
-    if successful_fixes > 0:
+    # Commit and push if any fixes were applied and auto_fix is enabled
+    if successful_fixes > 0 and auto_fix:
         print("\nCommitting and pushing changes...")
         setup_git_remote()
-        commit_and_push_changes(commit_branch)
+        commit_and_push_changes(commit_branch, ignore_paths=[
+            "init_output.txt",
+            "plan_*.txt",
+            "tfplan.json"
+        ])
+    elif successful_fixes > 0:
+        print(f"\n{successful_fixes} fixes available but auto-fix is disabled")
     else:
         print("\nNo fixes were applied - skipping git operations")
 
@@ -326,8 +366,10 @@ def main():
                 f.write("```\n")
                 f.write(ai_response)
                 f.write("\n```\n")
-                if successful_fixes > 0:
+                if successful_fixes > 0 and auto_fix:
                     f.write(f"\n>Auto-fix completed! Pull the '{commit_branch}' branch and review the code locally.\n")
+                elif successful_fixes > 0:
+                    f.write(f"\n>{successful_fixes} fixes identified but auto-fix is disabled. Enable auto-fix to apply changes automatically.\n")
                 else:
                     f.write(f"\n>No fixes could be applied automatically. Manual intervention may be required.\n")
             print("GitHub summary updated")

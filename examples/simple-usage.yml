@@ -1,0 +1,23 @@
+name: Simple Terraform Analysis
+
+on: [push, pull_request]
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+      
+      - name: Terraform Plan
+        run: terraform plan 2>&1 | tee terraform.log
+        continue-on-error: true
+      
+      - name: AI Analysis on Failure
+        if: failure()
+        uses: your-username/terraform-ai-analyzer@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

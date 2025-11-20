@@ -1,0 +1,133 @@
+name: 'Terraform AI Analyzer'
+description: 'Analyze Terraform errors with AI and automatically fix common issues'
+author: 'terraform-analyzer'
+branding:
+  icon: 'tool'
+  color: 'purple'
+
+inputs:
+  terraform-directory:
+    description: 'Directory containing Terraform files'
+    required: false
+    default: './terraform'
+  openai-api-key:
+    description: 'OpenAI API key for AI analysis'
+    required: true
+  github-token:
+    description: 'GitHub token for creating PRs'
+    required: true
+  auto-fix:
+    description: 'Automatically apply fixes and create PR'
+    required: false
+    default: 'true'
+  branch-name:
+    description: 'Branch name for auto-fixes'
+    required: false
+    default: 'auto-tf-fix'
+  mode:
+    description: 'Action mode: analyze (for errors) or cost (for successful plans)'
+    required: false
+    default: 'analyze'
+  infracost-api-key:
+    description: 'Infracost API key (required when mode=cost)'
+    required: false
+  infracost-branch:
+    description: 'Branch name for storing infracost data'
+    required: false
+    default: 'infracost'
+
+
+outputs:
+  fixes-applied:
+    description: 'Number of fixes applied'
+  analysis-summary:
+    description: 'AI analysis summary'
+  cost-breakdown:
+    description: 'Cost analysis results'
+
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install openai python-hcl2
+
+    - name: Copy analyzer script
+      shell: bash
+      run: |
+        cp ${{ github.action_path }}/terraform-analyzer.py ./terraform-analyzer.py
+        chmod +x ./terraform-analyzer.py
+
+    - name: Run Terraform analyzer
+      if: inputs.mode == 'analyze'
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        CODE_PATH: ${{ inputs.terraform-directory }}
+        AUTO_FIX: ${{ inputs.auto-fix }}
+        BRANCH_NAME: ${{ inputs.branch-name }}
+      run: |
+        mkdir -p logs
+        if [ -f terraform.log ]; then
+          cp terraform.log logs/terraform.log
+        fi
+        python terraform-analyzer.py
+
+    - name: Install Infracost
+      if: inputs.mode == 'cost'
+      shell: bash
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+        echo "$HOME/.infracost/bin" >> $GITHUB_PATH
+
+    - name: Run cost analysis
+      if: inputs.mode == 'cost'
+      shell: bash
+      env:
+        INFRACOST_API_KEY: ${{ inputs.infracost-api-key }}
+      run: |
+        cd ${{ inputs.terraform-directory }}
+        if [ -f tfplan ]; then
+          infracost breakdown --path tfplan --format json --out-file ../infracost.json
+          infracost breakdown --path tfplan >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Get branch name for cost tracking
+      if: inputs.mode == 'cost'
+      id: extract_branch
+      shell: bash
+      run: |
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          echo "branch_name=${{ github.event.pull_request.base.ref }}-pr" >> "$GITHUB_OUTPUT"
+        else
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Setup Git for cost tracking
+      if: inputs.mode == 'cost'
+      shell: bash
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Save cost data to infracost branch
+      if: inputs.mode == 'cost'
+      shell: bash
+      run: |
+        git checkout -B ${{ inputs.infracost-branch }}
+        FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
+        cp ./infracost.json "./$FILENAME"
+        git add "$FILENAME"
+        git commit -m "Update $FILENAME [skip ci]" || echo "No changes to commit"
+        git push origin ${{ inputs.infracost-branch }} --force
+
+

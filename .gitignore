@@ -1,19 +1,36 @@
 # Terraform
 *.tfstate
 *.tfstate.*
-.terraform/
-.terraform.lock.hcl
 *.tfvars
 *.tfplan
-*.tfplan.*
+.terraform/
+.terraform.lock.hcl
+terraform.log
+logs/
 
-# JetBrains IDEs
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
 .idea/
-*.iws
-*.iml
-*.ipr
-out/
+*.swp
+*.swo
 
-# General
+# OS
 .DS_Store
-*.log
+Thumbs.db
+
+# Backup files
+*.backup
+
+# Infracost
+infracost.json
+infracost-*.json

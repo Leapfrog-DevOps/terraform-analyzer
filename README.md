@@ -1,40 +1,92 @@
-# Terraform Modular Infrastructure
+# Terraform AI Analyzer Action
 
-This project creates AWS infrastructure using a modular Terraform approach with the following resources:
-- S3 bucket with versioning and encryption
-- Lambda function with IAM role
-- EC2 t3.small instance with security group
+Automatically analyze and fix Terraform errors using AI, with optional cost analysis.
+
+## Features
+
+- 🤖 AI-powered Terraform error analysis using OpenAI
+- 🔧 Automatic fix generation and application
+
+- 🔄 Auto-creates PR with fixes
+- 📝 Detailed analysis reports
 
 ## Usage
 
-1. Copy the example variables file:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   ```
+```yaml
+name: Terraform CI/CD
+on: [push, pull_request]
 
-2. Edit `terraform.tfvars` with your desired values (ensure S3 bucket name is globally unique)
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.11.4
+      
+      - name: Terraform Init
+        run: terraform init
+        continue-on-error: true
+      
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan 2>&1 | tee terraform.log
+        continue-on-error: true
+      
+      - name: Analyze Terraform Errors
+        if: failure()
+        uses: your-username/terraform-ai-analyzer@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          terraform-directory: './terraform'
+          auto-fix: 'true'
+          run-cost-analysis: 'true'
+          infracost-api-key: ${{ secrets.INFRACOST_API_KEY }}
+```
 
-3. Initialize Terraform:
-   ```bash
-   terraform init
-   ```
+## Inputs
 
-4. Plan the deployment:
-   ```bash
-   terraform plan
-   ```
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `openai-api-key` | OpenAI API key for AI analysis | Yes | - |
+| `github-token` | GitHub token for creating PRs | Yes | - |
+| `terraform-directory` | Directory containing Terraform files | No | `./terraform` |
+| `auto-fix` | Automatically apply fixes and create PR | No | `true` |
+| `branch-name` | Branch name for auto-fixes | No | `auto-tf-fix` |
 
-5. Apply the configuration:
-   ```bash
-   terraform apply
-   ```
-
-## Modules
-
-- `modules/s3/` - S3 bucket configuration
-- `modules/lambda/` - Lambda function with Python runtime
-- `modules/ec2/` - EC2 instance with security group
 
 ## Outputs
 
-The configuration outputs important resource information including bucket name, Lambda ARN, and EC2 instance details.
+| Output | Description |
+|--------|-------------|
+| `fixes-applied` | Number of fixes applied |
+| `analysis-summary` | AI analysis summary |
+
+
+## How it Works
+
+1. **Error Detection**: Analyzes Terraform logs for errors
+2. **AI Analysis**: Uses OpenAI to understand and generate fixes
+3. **Code Fixing**: Automatically applies fixes to Terraform files
+4. **PR Creation**: Creates a pull request with the fixes
+
+
+## Prerequisites
+
+- OpenAI API key with access to GPT-4
+- GitHub token with repository write permissions
+
+
+## Supported Terraform Resources
+
+- All AWS resources (EC2, S3, RDS, Lambda, etc.)
+- Preserves original code structure and formatting
+- Handles complex nested configurations
+- Maintains all existing attributes and tags
+
+## License
+
+MIT License - see LICENSE file for details
