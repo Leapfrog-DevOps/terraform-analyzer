@@ -5,7 +5,7 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-CODE_PATH = "./terraform/"
+CODE_PATH = os.getenv("CODE_PATH", "./terraform/")
 
 
 def retrieve_relevant_context(log_content):
@@ -297,7 +297,8 @@ def setup_git_remote():
 
 
 def main():
-    commit_branch = "auto-tf-fix"  # replace this with branch name of your choice
+    commit_branch = os.getenv("BRANCH_NAME", "auto-tf-fix")
+    auto_fix = os.getenv("AUTO_FIX", "true").lower() == "true"
 
     print("Starting Terraform error analysis and auto-fix...")
 
@@ -331,9 +332,16 @@ def main():
             successful_fixes += 1
 
     print(f"\nSuccessfully applied {successful_fixes}/{len(fixes)} fixes")
+    
+    # Set GitHub Action outputs
+    github_output = os.getenv("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"fixes-applied={successful_fixes}\n")
+            f.write(f"analysis-summary={ai_response[:500]}...\n")
 
-    # Commit and push if any fixes were applied
-    if successful_fixes > 0:
+    # Commit and push if any fixes were applied and auto_fix is enabled
+    if successful_fixes > 0 and auto_fix:
         print("\nCommitting and pushing changes...")
         setup_git_remote()
         commit_and_push_changes(commit_branch, ignore_paths=[
@@ -341,6 +349,8 @@ def main():
             "plan_*.txt",
             "tfplan.json"
         ])
+    elif successful_fixes > 0:
+        print(f"\n{successful_fixes} fixes available but auto-fix is disabled")
     else:
         print("\nNo fixes were applied - skipping git operations")
 
@@ -356,8 +366,10 @@ def main():
                 f.write("```\n")
                 f.write(ai_response)
                 f.write("\n```\n")
-                if successful_fixes > 0:
+                if successful_fixes > 0 and auto_fix:
                     f.write(f"\n>Auto-fix completed! Pull the '{commit_branch}' branch and review the code locally.\n")
+                elif successful_fixes > 0:
+                    f.write(f"\n>{successful_fixes} fixes identified but auto-fix is disabled. Enable auto-fix to apply changes automatically.\n")
                 else:
                     f.write(f"\n>No fixes could be applied automatically. Manual intervention may be required.\n")
             print("GitHub summary updated")
