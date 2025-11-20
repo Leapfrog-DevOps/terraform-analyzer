@@ -1,0 +1,101 @@
+name: Terraform CI/CD with AI Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        default: plan
+        type: choice
+        options:
+          - apply
+          - plan
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEPLOYMENT_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: '1.11.4'
+
+      - name: Terraform Init
+        id: init
+        run: |
+          cd terraform
+          terraform init 2>&1 | tee ../terraform.log
+        continue-on-error: true
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan'
+        run: |
+          cd terraform
+          terraform plan -out=tfplan -detailed-exitcode 2>&1 | tee ../plan_output.txt
+          PLAN_EXIT_CODE=${PIPESTATUS[0]}
+          cat ../plan_output.txt >> ../terraform.log
+          echo "--- END OF PLAN ---" >> ../terraform.log
+
+          terraform show -no-color tfplan > ../plan_readable.txt || true
+          terraform show -json tfplan > tfplan.json
+
+          grep -E '^  # |Plan: |No changes.' ../plan_output.txt | nl > ../plan_summary.txt
+        continue-on-error: true
+
+      - name: Terraform Apply
+        id: apply
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'
+        run: |
+          cd terraform
+          terraform apply -auto-approve 2>&1 | tee -a ../terraform.log
+        continue-on-error: true
+
+      - name: Analyze Terraform Errors with AI
+        if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure'
+        uses: karna256/terraform-analyzer@v0.0.1
+        with:
+          mode: 'analyze'
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          terraform-directory: './terraform'
+          auto-fix: 'true'
+          branch-name: 'ai-terraform-fixes'
+
+      - name: Analyze Terraform Costs
+        if: steps.plan.outcome == 'success'
+        uses: karna256/terraform-analyzer@v0.0.1
+        with:
+          mode: 'cost'
+          infracost-api-key: ${{ secrets.INFRACOST_API_KEY }}
+          terraform-directory: './terraform'
+          infracost-branch: 'cost-tracking'
+
+
+      - name: Fail workflow if Terraform failed
+        if: steps.init.outcome == 'failure' || steps.plan.outcome == 'failure' || steps.apply.outcome == 'failure'
+        run: |
+          echo "Terraform failed. Check the AI analysis results above."
+          exit 1
