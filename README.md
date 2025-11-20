@@ -1,10 +1,13 @@
 # Terraform Analyzer
 
-An intelligent Terraform automation tool that combines infrastructure deployment with AI-powered error analysis and cost optimization. This project provides automated Terraform workflows with built-in error detection, automatic fixes, and cost analysis using OpenAI and Infracost.
+An intelligent Terraform automation tool that combines infrastructure deployment with AI-powered error analysis and cost
+optimization. This project provides automated Terraform workflows with built-in error detection, automatic fixes, and
+cost analysis using OpenAI and Infracost.
 
 ## 🚀 Features
 
 ### Core Capabilities
+
 - **Automated Terraform Operations**: Plan and apply infrastructure changes via GitHub Actions
 - **AI-Powered Error Analysis**: Automatically analyzes Terraform failures using OpenAI GPT-4
 - **Intelligent Auto-Fix**: Generates and applies code fixes for common Terraform errors
@@ -12,6 +15,7 @@ An intelligent Terraform automation tool that combines infrastructure deployment
 - **Pull Request Integration**: Provides detailed plan summaries and cost breakdowns in PR comments
 
 ### Infrastructure Components
+
 - **AWS S3**: Bucket creation and management
 - **AWS Lambda**: Function deployment with S3 integration
 - **AWS EC2**: Instance provisioning (modular)
@@ -53,12 +57,12 @@ Choose your preferred deployment method:
 name: Terraform AI Analyzer
 on:
   pull_request:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       action:
         type: choice
-        options: [plan, apply]
+        options: [ plan, apply ]
         default: plan
 
 permissions:
@@ -71,9 +75,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Terraform AI Analyzer
-        uses: Leapfrog-DevOps/terraform-analyzer@v0.3
+        uses: Leapfrog-DevOps/terraform-analyzer@v0.5
         with:
           deployment-role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -92,34 +96,34 @@ jobs:
 
 Add these to your repository secrets:
 
-| Secret | Description | Example |
-|--------|-------------|----------|
-| `AWS_DEPLOYMENT_ROLE` | AWS IAM role ARN for OIDC | `arn:aws:iam::123456789:role/deployment-role` |
-| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
-| `INFRACOST_API_KEY` | Infracost API key (optional) | `ico-...` |
+| Secret                | Description                  | Example                                       |
+|-----------------------|------------------------------|-----------------------------------------------|
+| `AWS_DEPLOYMENT_ROLE` | AWS IAM role ARN for OIDC    | `arn:aws:iam::123456789:role/deployment-role` |
+| `OPENAI_API_KEY`      | OpenAI API key               | `sk-...`                                      |
+| `INFRACOST_API_KEY`   | Infracost API key (optional) | `ico-...`                                     |
 
 ### ⚙️ Action Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|----------|
-| `terraform-version` | Terraform version | No | `1.11.4` |
-| `terraform-directory` | Directory with Terraform files | No | `./terraform` |
-| `action` | Terraform action (plan/apply) | No | `plan` |
-| `aws-region` | AWS region | No | `us-east-1` |
-| `deployment-role` | AWS IAM role ARN | **Yes** | - |
-| `openai-api-key` | OpenAI API key | **Yes** | - |
-| `infracost-api-key` | Infracost API key | No | - |
-| `enable-cost-analysis` | Enable cost analysis | No | `true` |
-| `comment-pr` | Comment on PRs | No | `true` |
+| Input                  | Description                    | Required | Default       |
+|------------------------|--------------------------------|----------|---------------|
+| `terraform-version`    | Terraform version              | No       | `1.11.4`      |
+| `terraform-directory`  | Directory with Terraform files | No       | `./terraform` |
+| `action`               | Terraform action (plan/apply)  | No       | `plan`        |
+| `aws-region`           | AWS region                     | No       | `us-east-1`   |
+| `deployment-role`      | AWS IAM role ARN               | **Yes**  | -             |
+| `openai-api-key`       | OpenAI API key                 | **Yes**  | -             |
+| `infracost-api-key`    | Infracost API key              | No       | -             |
+| `enable-cost-analysis` | Enable cost analysis           | No       | `true`        |
+| `comment-pr`           | Comment on PRs                 | No       | `true`        |
 
 ### 📤 Action Outputs
 
-| Output | Description |
-|--------|--------------|
-| `plan-exitcode` | Terraform plan exit code |
-| `apply-exitcode` | Terraform apply exit code |
-| `has-changes` | Whether plan detected changes |
-| `cost-analysis` | Cost analysis results |
+| Output           | Description                   |
+|------------------|-------------------------------|
+| `plan-exitcode`  | Terraform plan exit code      |
+| `apply-exitcode` | Terraform apply exit code     |
+| `has-changes`    | Whether plan detected changes |
+| `cost-analysis`  | Cost analysis results         |
 
 ---
 
@@ -128,8 +132,9 @@ Add these to your repository secrets:
 **Perfect for**: Custom workflows, advanced configuration, learning the internals
 
 ### 📋 Prerequisites
+
 - **AWS Account** with appropriate permissions
-- **GitHub repository** with Actions enabled  
+- **GitHub repository** with Actions enabled
 - **OpenAI API key** for error analysis
 - **Infracost API key** for cost analysis (optional)
 - **Git** installed locally
@@ -138,21 +143,26 @@ Add these to your repository secrets:
 ### Step-by-Step Setup
 
 #### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/Leapfrog-DevOps/terraform-analyzer.git
 cd terraform-analyzer
 ```
 
 #### 2. Add Your Terraform Code
-> ⚠️ **IMPORTANT**: The current Terraform code in this repository is just a placeholder for demonstration purposes. **DO NOT run it directly** as it may create unwanted AWS resources or fail due to missing dependencies.
+
+> ⚠️ **IMPORTANT**: The current Terraform code in this repository is just a placeholder for demonstration purposes. **DO
+NOT run it directly** as it may create unwanted AWS resources or fail due to missing dependencies.
 
 Replace the placeholder code with your actual Terraform infrastructure:
 
 **Custom Directory Setup (Optional):**
 If you prefer a different directory structure:
+
 1. Create your custom folder (e.g., `infrastructure/`)
 2. Update `CODE_PATH` variable in `terraform-analyzer.py`
 3. Update working directory paths in `.github/workflows/terraform-analyzer.yml`
+
 ```bash
 # Remove existing placeholder files
 rm -rf terraform/*
@@ -169,19 +179,23 @@ terraform/
 #### 3. Setup API Keys
 
 **Get OpenAI API Key:**
+
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Create new API key
 3. Copy the key (starts with `sk-`)
 
 **Get Infracost API Key:**
+
 1. Visit [Infracost Dashboard](https://dashboard.infracost.io/)
 2. Sign up/login and get API key
 3. Copy the key (starts with `ico-`)
 
 #### 4. Configure GitHub Secrets
+
 Go to your GitHub repository → Settings → Secrets and variables → Actions
 
 **Add Repository Secrets:**
+
 ```yaml
 DEPLOYMENT_ROLE: arn:aws:iam::<your-account>:role/deployment-role
 OPENAI_API_KEY: sk-your-openai-key-here
@@ -190,6 +204,7 @@ INFRACOST_API_KEY: ico-your-infracost-key-here
 ```
 
 **Add Repository Variables:**
+
 ```yaml
 AWS_REGION: us-east-1
 ENVIRONMENT: dev
@@ -199,6 +214,7 @@ DEPLOY_LAMBDA: true
 #### 5. Setup AWS Deployment Role
 
 **Create IAM Role:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -221,6 +237,7 @@ DEPLOY_LAMBDA: true
 ```
 
 **Attach Required Policies:**
+
 - S3 bucket operations
 - Lambda function management
 - EC2 instance management
@@ -228,7 +245,9 @@ DEPLOY_LAMBDA: true
 - IAM permissions for resource creation
 
 #### 6. Setup Remote State (First Time Only)
+
 Create S3 bucket and DynamoDB table for Terraform state:
+
 ```bash
 # Create S3 bucket for state
 aws s3 mb s3://terraform-state-bucket-team5-opensource --region us-east-1
@@ -245,11 +264,14 @@ aws dynamodb create-table \
 ## 🚦 Running the Project
 
 ### Method 1: Automatic Triggers
+
 The workflow automatically runs on:
+
 - **Pull Requests** to `final_test` branch → Runs `terraform plan`
 - **Manual Dispatch** → Choose between `plan` or `apply`
 
 ### Method 2: Manual Execution
+
 1. Go to Actions tab in your repository
 2. Select "Terraform - Plan & Apply" workflow
 3. Click "Run workflow"
@@ -257,6 +279,7 @@ The workflow automatically runs on:
 5. Click "Run workflow" button
 
 ### Method 3: Create Pull Request
+
 1. Create a new branch:
    ```bash
    git checkout -b feature/my-infrastructure
@@ -272,7 +295,9 @@ The workflow automatically runs on:
 5. Workflow automatically runs `terraform plan`
 
 ### First Run Setup
-> ⚠️ **WARNING**: Make sure you have replaced the placeholder Terraform code with your actual infrastructure code before running any workflows.
+
+> ⚠️ **WARNING**: Make sure you have replaced the placeholder Terraform code with your actual infrastructure code before
+> running any workflows.
 
 1. Ensure all secrets and variables are configured
 2. Replace placeholder Terraform code with your actual infrastructure
@@ -284,12 +309,16 @@ The workflow automatically runs on:
 ### Workflow Behavior
 
 #### On Pull Request
+
 1. Runs `terraform plan`
 2. Posts plan summary as PR comment
-3. **If plan fails**: Triggers AI error analysis and creates auto-fix branch ![Plan Fail](screenshots/failed_pipeline.png) ![Terraform Fix](screenshots/terraform_fix.png)
-4. **If plan succeeds**: Uploads plan artifacts and triggers cost analyzer workflow ![Cost Analysis](screenshots/infracost.png)
+3. **If plan fails**: Triggers AI error analysis and creates auto-fix
+   branch ![Plan Fail](screenshots/failed_pipeline.png) ![Terraform Fix](screenshots/terraform_fix.png)
+4. **If plan succeeds**: Uploads plan artifacts and triggers cost analyzer
+   workflow ![Cost Analysis](screenshots/infracost.png)
 
 #### On Manual Apply
+
 1. Runs `terraform apply`
 2. If successful, create infrastructure
 3. If errors occur, runs the analyzer and attempts and push to auto-fix branch.
@@ -297,6 +326,7 @@ The workflow automatically runs on:
 ## 🤖 AI Error Analysis
 
 ### How It Works
+
 When Terraform operations fail, the analyzer:
 
 1. **Extracts Context**: Parses error logs and identifies relevant files
@@ -306,6 +336,7 @@ When Terraform operations fail, the analyzer:
 5. **Creates PR**: Pushes fixes to `auto-tf-fix` branch
 
 ### Supported Error Types
+
 - Resource configuration errors
 - Provider version conflicts
 - Variable reference issues
@@ -313,6 +344,7 @@ When Terraform operations fail, the analyzer:
 - AWS resource conflicts
 
 ### Auto-Fix Features
+
 - Preserves original code structure
 - Only modifies problematic sections
 - Creates backup files before changes
@@ -322,6 +354,7 @@ When Terraform operations fail, the analyzer:
 ## 💰 Cost Analysis
 
 ### Infracost Integration
+
 - Analyzes infrastructure costs before deployment
 - Compares costs between different plan versions
 - Tracks cost changes over time
@@ -330,6 +363,7 @@ When Terraform operations fail, the analyzer:
 - **Free Tier**: Up to 1,000 runs per month at no cost
 
 ### Cost Tracking
+
 - Baseline costs stored per environment
 - Diff analysis for PR changes
 - Historical cost data retention
@@ -338,6 +372,7 @@ When Terraform operations fail, the analyzer:
 ## 🔧 Configuration
 
 ### Terraform Variables
+
 Customize infrastructure in `terraform/variables.tf`:
 
 ```hcl
@@ -361,7 +396,9 @@ variable "lambda_function_name" {
 ```
 
 ### Workflow Customization
+
 Modify `.github/workflows/terraform-analyzer.yml` to:
+
 - Change trigger branches
 - Adjust Terraform version
 - Modify auto-fix branch names
@@ -370,12 +407,14 @@ Modify `.github/workflows/terraform-analyzer.yml` to:
 ## 📊 Monitoring & Debugging
 
 ### Logs & Artifacts
+
 - Terraform logs stored in `logs/terraform.log`
 - Plan files uploaded as GitHub artifacts
 - Cost analysis results in step summaries
 - Auto-fix results in GitHub summaries
 
 ### Troubleshooting
+
 1. Check workflow logs for detailed error information
 2. Review AI analysis output in failed runs
 3. Examine auto-fix branch for proposed changes
@@ -392,11 +431,12 @@ Modify `.github/workflows/terraform-analyzer.yml` to:
 
 ## 📝 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is open source and available under the [GPL-3.0 License](LICENSE).
 
 ## 🆘 Support
 
 For issues and questions:
+
 - Create GitHub Issues for bugs and feature requests
 - Check workflow logs for deployment issues
 - Review AI analysis output for Terraform errors
@@ -405,6 +445,67 @@ For issues and questions:
 ## 🔮 Plan for Future
 
 We are planning to build our own AI-powered open source cost analyzer.
+
+## 👥 Contributors
+
+Thanks to these amazing people who have contributed to this project:
+
+<table style="border: none;">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/BinayaDahal">
+        <img src="https://github.com/BinayaDahal.png" width="100px;" alt="Binaya Dahal" style="border-radius: 50%;"/>
+        <br />
+        <sub><b>Binaya Dahal</b></sub>
+      </a>
+      <br />
+      <sub>Idea, Core Developer & Documentation</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/Rabindra20">
+        <img src="https://github.com/Rabindra20.png" width="100px;" alt="Rabindra Raj Sah" style="border-radius: 50%;"/>
+        <br />
+        <sub><b>Rabindra Raj Sah</b></sub>
+      </a>
+      <br />
+      <sub>Core Developer & Coordinator</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/karna256">
+        <img src="https://github.com/karna256.png" width="100px;" alt="Ankit Karna" style="border-radius: 50%;"/>
+        <br />
+        <sub><b>Ankit Karna</b></sub>
+      </a>
+      <br />
+      <sub>GitHub Actions & Automation</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/mrcodedbrain">
+        <img src="https://github.com/mrcodedbrain.png" width="100px;" alt="Santosh Bhandari" style="border-radius: 50%;"/>
+        <br />
+        <sub><b>Santosh Bhandari</b></sub>
+      </a>
+      <br />
+      <sub>Security Testing</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/jenithshrestha">
+        <img src="https://github.com/jenithshrestha.png" width="100px;" alt="Jenith Shrestha" style="border-radius: 50%;"/>
+        <br />
+        <sub><b>Jenith Shrestha</b></sub>
+      </a>
+      <br />
+      <sub>Quality Control</sub>
+    </td>
+  </tr>
+</table>
+
+## 🙏 Credits
+
+**Special thanks to [Infracost](https://www.infracost.io/)** for providing the excellent infrastructure cost calculation
+tool that powers our cost analysis features. Your tool makes it possible for teams to understand and optimize their
+cloud spending before deployment. We're grateful for your contribution to the DevOps community and for making cost
+transparency accessible to everyone.
 
 ---
 
