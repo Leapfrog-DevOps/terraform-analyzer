@@ -93,79 +93,30 @@ jobs:
             exit 1
           fi
 
-      - name: Install Infracost
+      - name: Install OpenInfraQuote
         if: steps.download_tfplan.outputs.skip_cost != 'true'
         run: |
-          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
-          echo "$HOME/.infracost/bin" >> $GITHUB_PATH
-
-      - name: Get branch name (push or PR)
-        if: steps.download_tfplan.outputs.skip_cost != 'true'
-        id: extract_branch
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "branch_name=${{ github.event.pull_request.base.ref }}-pr" >> "$GITHUB_OUTPUT"
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/terrateamio/openinfraquote/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
+          echo "Installing OpenInfraQuote version $LATEST_VERSION"
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            ARCH="amd64"
+          elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+            ARCH="arm64"
           else
-            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-            echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+            echo "Unsupported architecture: $ARCH"
+            exit 1
           fi
+          curl -L "https://github.com/terrateamio/openinfraquote/releases/download/${LATEST_VERSION}/oiq-linux-${ARCH}-${LATEST_VERSION}.tar.gz" -o "oiq.tar.gz"
+          tar -xzf oiq.tar.gz
+          chmod +x oiq
+          sudo mv oiq /usr/local/bin/
 
-      - name: Run Infracost
-        if: steps.download_tfplan.outputs.skip_cost != 'true'
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-        run: |
-          infracost breakdown --path . > infracost-output.txt
-          echo "### Infracost Breakdown :chart_with_upwards_trend:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The following is the result of the Infracost breakdown:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          cat infracost-output.txt >> $GITHUB_STEP_SUMMARY
-          infracost breakdown --path . --format json --out-file infracost.json
-
-      - name: Check diff infracost
-        if: steps.download_tfplan.outputs.skip_cost != 'true' && github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
-        env:
-          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-        run: |
-          set -e  # Exit immediately if a command fails
-          FILE="infracost-${{ steps.extract_branch.outputs.branch_name }}-pr.json"
-          # Fetch remote branch
-          git fetch origin infracost
-          # Check if the file exists in the remote infracost branch
-          if git ls-tree -r origin/infracost --name-only | grep -q "^${FILE}$"; then
-            echo "✅ Found ${FILE} in origin/infracost, checking it out..."
-            git checkout origin/infracost -- "${FILE}"
-            infracost diff --path . --compare-to "${FILE}"
-          else
-            echo "⚠️ File ${FILE} does not exist in origin/infracost — skipping infracost diff."
-          fi
-
-      - name: Set up Git
+      - name: Download Price Sheet
         if: steps.download_tfplan.outputs.skip_cost != 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv
 
-      - name: Create/switch to environment branch
-        if: steps.download_tfplan.outputs.skip_cost != 'true'
+      - name: Run Infraquote
         run: |
-          git checkout -B infracost
-
-      - name: Copy Infracost JSON to correct filename
-        if: steps.download_tfplan.outputs.skip_cost != 'true'
-        run: |
-          FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
-          cp ./infracost.json "./$FILENAME"
-
-      - name: Commit Infracost JSON to infracost branch
-        if: steps.download_tfplan.outputs.skip_cost != 'true'
-        run: |
-          FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
-          git add "$FILENAME"
-          git commit -m "Update $FILENAME [skip ci]" || echo "No changes to commit"
-
-      - name: Push to environment branch
-        if: steps.download_tfplan.outputs.skip_cost != 'true'
-        run: |
-          git push origin infracost --force
+          oiq match --pricesheet prices.csv tfplan.json | oiq price --region $AWS_REGION
