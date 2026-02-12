@@ -88,6 +88,8 @@ runs:
       if: inputs.mode == 'cost'
       shell: bash
       run: |
+        cd ${{ inputs.terraform-directory }}
+        curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv
         LATEST_VERSION=$(curl -s https://api.github.com/repos/terrateamio/openinfraquote/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
         echo "Installing OpenInfraQuote version $LATEST_VERSION"
         ARCH=$(uname -m)
@@ -104,15 +106,10 @@ runs:
         chmod +x oiq
         sudo mv oiq /usr/local/bin/
 
-    - name: Download Price Sheet
-      if: inputs.mode == 'cost'
-      shell: bash
-      run: |
-        curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv
-
     - name: Run Infraquote
       shell: bash
       run: |
+        cd ${{ inputs.terraform-directory }}
         oiq match --pricesheet prices.csv tfplan.json | oiq price --region $AWS_REGION >> $GITHUB_STEP_SUMMARY
 
 #    - name: Install Infracost
