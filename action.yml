@@ -28,13 +28,13 @@ inputs:
     description: 'Action mode: analyze (for errors) or cost (for successful plans)'
     required: false
     default: 'analyze'
-  infracost-api-key:
-    description: 'Infracost API key (required when mode=cost)'
-    required: false
-  infracost-branch:
-    description: 'Branch name for storing infracost data'
-    required: false
-    default: 'infracost'
+#  infracost-api-key:
+#    description: 'Infracost API key (required when mode=cost)'
+#    required: false
+#  infracost-branch:
+#    description: 'Branch name for storing infracost data'
+#    required: false
+#    default: 'infracost'
 
 
 outputs:
@@ -50,16 +50,19 @@ runs:
   using: 'composite'
   steps:
     - name: Setup Python
+      if: inputs.mode == 'analyze'
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
 
     - name: Install dependencies
+      if: inputs.mode == 'analyze'
       shell: bash
       run: |
         pip install openai python-hcl2
 
     - name: Copy analyzer script
+      if: inputs.mode == 'analyze'
       shell: bash
       run: |
         cp ${{ github.action_path }}/terraform-analyzer.py ./terraform-analyzer.py
@@ -81,52 +84,83 @@ runs:
         fi
         python terraform-analyzer.py
 
-    - name: Install Infracost
+    - name: Install OpenInfraQuote
       if: inputs.mode == 'cost'
       shell: bash
       run: |
-        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
-        echo "$HOME/.infracost/bin" >> $GITHUB_PATH
-
-    - name: Run cost analysis
-      if: inputs.mode == 'cost'
-      shell: bash
-      env:
-        INFRACOST_API_KEY: ${{ inputs.infracost-api-key }}
-      run: |
-        cd ${{ inputs.terraform-directory }}
-        if [ -f tfplan ]; then
-          infracost breakdown --path tfplan --format json --out-file ../infracost.json
-          infracost breakdown --path tfplan >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Get branch name for cost tracking
-      if: inputs.mode == 'cost'
-      id: extract_branch
-      shell: bash
-      run: |
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "branch_name=${{ github.event.pull_request.base.ref }}-pr" >> "$GITHUB_OUTPUT"
+        LATEST_VERSION=$(curl -s https://api.github.com/repos/terrateamio/openinfraquote/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
+        echo "Installing OpenInfraQuote version $LATEST_VERSION"
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "x86_64" ]; then
+          ARCH="amd64"
+        elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+          ARCH="arm64"
         else
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "Unsupported architecture: $ARCH"
+          exit 1
         fi
+        curl -L "https://github.com/terrateamio/openinfraquote/releases/download/${LATEST_VERSION}/oiq-linux-${ARCH}-${LATEST_VERSION}.tar.gz" -o "oiq.tar.gz"
+        tar -xzf oiq.tar.gz
+        chmod +x oiq
+        sudo mv oiq /usr/local/bin/
 
-    - name: Setup Git for cost tracking
+    - name: Download Price Sheet
       if: inputs.mode == 'cost'
       shell: bash
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
+        curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv
 
-    - name: Save cost data to infracost branch
-      if: inputs.mode == 'cost'
+    - name: Run Infraquote
       shell: bash
       run: |
-        git checkout -B ${{ inputs.infracost-branch }}
-        FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
-        cp ./infracost.json "./$FILENAME"
-        git add "$FILENAME"
-        git commit -m "Update $FILENAME [skip ci]" || echo "No changes to commit"
-        git push origin ${{ inputs.infracost-branch }} --force
+        oiq match --pricesheet prices.csv tfplan.json | oiq price --region $AWS_REGION >> $GITHUB_STEP_SUMMARY
+
+#    - name: Install Infracost
+#      if: inputs.mode == 'cost'
+#      shell: bash
+#      run: |
+#        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+#        echo "$HOME/.infracost/bin" >> $GITHUB_PATH
+#
+#    - name: Run cost analysis
+#      if: inputs.mode == 'cost'
+#      shell: bash
+#      env:
+#        INFRACOST_API_KEY: ${{ inputs.infracost-api-key }}
+#      run: |
+#        cd ${{ inputs.terraform-directory }}
+#        if [ -f tfplan ]; then
+#          infracost breakdown --path tfplan --format json --out-file ../infracost.json
+#          infracost breakdown --path tfplan >> $GITHUB_STEP_SUMMARY
+#        fi
+#
+#    - name: Get branch name for cost tracking
+#      if: inputs.mode == 'cost'
+#      id: extract_branch
+#      shell: bash
+#      run: |
+#        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+#          echo "branch_name=${{ github.event.pull_request.base.ref }}-pr" >> "$GITHUB_OUTPUT"
+#        else
+#          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+#          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+#        fi
+#
+#    - name: Setup Git for cost tracking
+#      if: inputs.mode == 'cost'
+#      shell: bash
+#      run: |
+#        git config user.name "github-actions[bot]"
+#        git config user.email "github-actions[bot]@users.noreply.github.com"
+#
+#    - name: Save cost data to infracost branch
+#      if: inputs.mode == 'cost'
+#      shell: bash
+#      run: |
+#        git checkout -B ${{ inputs.infracost-branch }}
+#        FILENAME="infracost-${{ steps.extract_branch.outputs.branch_name }}.json"
+#        cp ./infracost.json "./$FILENAME"
+#        git add "$FILENAME"
+#        git commit -m "Update $FILENAME [skip ci]" || echo "No changes to commit"
+#        git push origin ${{ inputs.infracost-branch }} --force
 
